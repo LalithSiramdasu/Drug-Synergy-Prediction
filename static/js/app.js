@@ -154,8 +154,8 @@ function renderBackendHealth(health) {
   setText("metric-models", availableModels);
   setText("health-drugs", availableDrugs);
   setText("health-features", featureColumns);
-  setText("backend-status-title", isReady ? "Backend ready" : "Backend error");
-  setText("backend-status", isReady ? "Health check passed via /api/health" : errors[0] || health.message || "Backend health check failed.");
+  setText("backend-status-title", isReady ? "" : "Backend error");
+  setText("backend-status", isReady ? "" : errors[0] || health.message || "Backend health check failed.");
   updateBackendHealthTone(isReady ? "success" : "danger", isReady ? "Ready" : "Error");
 }
 

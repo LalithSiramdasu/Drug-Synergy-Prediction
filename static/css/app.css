@@ -448,13 +448,22 @@ body.is-ready .workspace-tabs.reveal,
   box-shadow: var(--shadow-soft);
 }
 
+.hero-metrics > .metric-card:nth-child(3) {
+  align-self: start;
+  min-height: 150px;
+  background:
+    linear-gradient(135deg, rgba(44, 197, 176, 0.08), rgba(90, 141, 255, 0.06)),
+    var(--surface-card-strong);
+}
+
 .metric-card--accent {
   background: linear-gradient(135deg, var(--metric-accent-start), var(--metric-accent-end));
 }
 
 .backend-health-card {
   display: grid;
-  gap: 12px;
+  gap: 9px;
+  align-content: start;
   border-color: rgba(15, 118, 110, 0.20);
 }
 
@@ -494,12 +503,28 @@ body.is-ready .workspace-tabs.reveal,
   gap: 6px;
   color: var(--muted-strong);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
 .health-stat-grid strong {
   color: var(--text);
+}
+
+.backend-health-card .metric-value {
+  margin-top: 4px;
+  font-size: clamp(1.18rem, 1.9vw, 1.42rem);
+  line-height: 1.12;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+#backend-status:empty {
+  display: none;
+}
+
+#backend-status-title:empty {
+  display: none;
 }
 
 .metric-value {
