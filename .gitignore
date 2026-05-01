@@ -1,0 +1,18 @@
+﻿.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Large files - do not push in small-files commit
+data/model_matrix.csv
+models/*.pkl
+molecules/*.pkl
+molecules/*.sdf
+
+# Runtime/generated files
+outputs/
+uploads/
+batch_output.csv
+flask-verify*.log
