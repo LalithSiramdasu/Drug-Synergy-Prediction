@@ -1,0 +1,2 @@
+NSC1,NSC2,CELLNAME,model_used,prediction_NSC1_to_NSC2,prediction_NSC2_to_NSC1,final_predicted_COMBOSCORE,model_path
+740,752,786-0,CatBoost,-40.2616578990885,-39.05950932307102,-39.66058361107976,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models\final_step6_catboost_786_0.pkl

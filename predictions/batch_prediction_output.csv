@@ -1,0 +1,4 @@
+row_index,NSC1,NSC2,CELLNAME,model_used,prediction_NSC1_to_NSC2,prediction_NSC2_to_NSC1,final_predicted_COMBOSCORE,model_path,status,error
+0,740,750,786-0,CatBoost,-15.484548102496127,-18.266707736502354,-16.87562791949924,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models\final_step6_catboost_786_0.pkl,success,
+1,740,752,A498,CatBoost,-29.46695213022647,-25.511975312744617,-27.489463721485542,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models\final_step6_catboost_A498.pkl,success,
+2,750,755,A549/ATCC,LightGBM,-24.163685277331503,-30.1385683849385,-27.151126831135002,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models\final_step6_lightgbm_A549_ATCC.pkl,success,

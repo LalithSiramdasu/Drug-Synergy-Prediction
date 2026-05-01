@@ -1,0 +1,18 @@
+file_key,path,exists,folder,filename
+combo_score,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\comboscore.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data,comboscore.csv
+drug_features,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\drug_features.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data,drug_features.csv
+model_matrix,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\model_matrix.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data,model_matrix.csv
+feature_columns,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\step6_final_model_feature_columns.json,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data,step6_final_model_feature_columns.json
+step5_all_model_comparison,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step5_all_cellline_model_comparison.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results,step5_all_cellline_model_comparison.csv
+step5_best_model_per_cellline,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step5_best_model_per_cellline.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results,step5_best_model_per_cellline.csv
+step5_average_model_performance,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step5_average_model_performance.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results,step5_average_model_performance.csv
+step6_final_model_summary,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step6_final_model_summary.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results,step6_final_model_summary.csv
+step6_final_model_registry,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step6_final_model_registry.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results,step6_final_model_registry.csv
+step7a_official_test_dataset,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions\step5_official_test_dataset.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,step5_official_test_dataset.csv
+step7a_best_model_test_predictions,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions\step5_best_model_test_predictions.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,step5_best_model_test_predictions.csv
+step7b_single_prediction,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions\final_model_single_prediction.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,final_model_single_prediction.csv
+step7c_batch_input,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions\batch_prediction_input.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,batch_prediction_input.csv
+step7c_batch_output,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions\batch_prediction_output.csv,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,batch_prediction_output.csv
+models_folder,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3,models
+predictions_folder,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\predictions,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3,predictions
+final_project_summary_folder,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\final_project_summary,True,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3,final_project_summary

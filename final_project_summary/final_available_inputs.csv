@@ -1,0 +1,5 @@
+item,count,source_file
+available_drugs,100,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\drug_features.csv
+available_cell_lines,60,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\results\step6_final_model_registry.csv
+final_model_features,526,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\data\step6_final_model_feature_columns.json
+final_models,60,C:\Users\HP\Desktop\SDP 27 april\nci_almanac_v3\models

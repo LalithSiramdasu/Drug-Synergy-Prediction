@@ -1,0 +1,106 @@
+nci_almanac_flask_app
+├── backend
+│   ├── __init__.py
+│   ├── molecule_aliases.json
+│   ├── routes
+│   │   └── __init__.py
+│   └── services
+│       └── __init__.py
+├── copy_assets.py
+├── data
+│   ├── drug_features.csv
+│   ├── model_matrix.csv
+│   └── step6_final_model_feature_columns.json
+├── final_project_summary
+│   ├── available_cell_lines.txt
+│   ├── available_drug_nscs.txt
+│   ├── final_available_inputs.csv
+│   ├── final_best_models_per_cellline.csv
+│   ├── final_flask_assets_manifest.csv
+│   ├── final_model_counts.csv
+│   ├── final_model_performance_summary.csv
+│   ├── final_pipeline_files_summary.csv
+│   └── final_project_readme.txt
+├── models
+│   ├── final_step6_catboost_786_0.pkl
+│   ├── final_step6_catboost_A498.pkl
+│   ├── final_step6_catboost_COLO_205.pkl
+│   ├── final_step6_catboost_HOP_62.pkl
+│   ├── final_step6_catboost_HT29.pkl
+│   ├── final_step6_catboost_MDA_MB_231_ATCC.pkl
+│   ├── final_step6_catboost_NCI_ADR_RES.pkl
+│   ├── final_step6_catboost_NCI_H23.pkl
+│   ├── final_step6_catboost_NCI_H460.pkl
+│   ├── final_step6_catboost_OVCAR_4.pkl
+│   ├── final_step6_catboost_OVCAR_5.pkl
+│   ├── final_step6_catboost_RXF_393.pkl
+│   ├── final_step6_catboost_SF_295.pkl
+│   ├── final_step6_catboost_SF_539.pkl
+│   ├── final_step6_catboost_SN12C.pkl
+│   ├── final_step6_catboost_SNB_75.pkl
+│   ├── final_step6_catboost_UACC_257.pkl
+│   ├── final_step6_lightgbm_A549_ATCC.pkl
+│   ├── final_step6_lightgbm_CAKI_1.pkl
+│   ├── final_step6_lightgbm_HCC_2998.pkl
+│   ├── final_step6_lightgbm_HCT_15.pkl
+│   ├── final_step6_lightgbm_HL_60_TB.pkl
+│   ├── final_step6_lightgbm_HOP_92.pkl
+│   ├── final_step6_lightgbm_IGROV1.pkl
+│   ├── final_step6_lightgbm_K_562.pkl
+│   ├── final_step6_lightgbm_MDA_MB_435.pkl
+│   ├── final_step6_lightgbm_MOLT_4.pkl
+│   ├── final_step6_lightgbm_PC_3.pkl
+│   ├── final_step6_lightgbm_RPMI_8226.pkl
+│   ├── final_step6_lightgbm_SK_MEL_5.pkl
+│   ├── final_step6_lightgbm_SR.pkl
+│   ├── final_step6_lightgbm_SW_620.pkl
+│   ├── final_step6_lightgbm_UACC_62.pkl
+│   ├── final_step6_lightgbm_UO_31.pkl
+│   ├── final_step6_randomforest_ACHN.pkl
+│   ├── final_step6_randomforest_BT_549.pkl
+│   ├── final_step6_randomforest_CCRF_CEM.pkl
+│   ├── final_step6_randomforest_HCT_116.pkl
+│   ├── final_step6_randomforest_HS_578T.pkl
+│   ├── final_step6_randomforest_KM12.pkl
+│   ├── final_step6_randomforest_LOX_IMVI.pkl
+│   ├── final_step6_randomforest_MALME_3M.pkl
+│   ├── final_step6_randomforest_MCF7.pkl
+│   ├── final_step6_randomforest_MDA_MB_468.pkl
+│   ├── final_step6_randomforest_NCI_H226.pkl
+│   ├── final_step6_randomforest_NCI_H522.pkl
+│   ├── final_step6_randomforest_OVCAR_3.pkl
+│   ├── final_step6_randomforest_SK_MEL_28.pkl
+│   ├── final_step6_randomforest_SNB_19.pkl
+│   ├── final_step6_xgboost_DU_145.pkl
+│   ├── final_step6_xgboost_EKVX.pkl
+│   ├── final_step6_xgboost_M14.pkl
+│   ├── final_step6_xgboost_NCI_H322M.pkl
+│   ├── final_step6_xgboost_OVCAR_8.pkl
+│   ├── final_step6_xgboost_SF_268.pkl
+│   ├── final_step6_xgboost_SK_MEL_2.pkl
+│   ├── final_step6_xgboost_SK_OV_3.pkl
+│   ├── final_step6_xgboost_TK_10.pkl
+│   ├── final_step6_xgboost_T_47D.pkl
+│   └── final_step6_xgboost_U251.pkl
+├── molecules
+│   ├── ComboCompoundSet.sdf
+│   └── drug_mols.pkl
+├── outputs
+├── predictions
+│   ├── batch_prediction_input.csv
+│   ├── batch_prediction_output.csv
+│   ├── final_model_single_prediction.csv
+│   ├── step5_best_model_test_predictions.csv
+│   └── step5_official_test_dataset.csv
+├── project_structure.txt
+├── results
+│   ├── step5_all_cellline_model_comparison.csv
+│   ├── step5_average_model_performance.csv
+│   ├── step5_best_model_per_cellline.csv
+│   ├── step6_final_model_registry.csv
+│   └── step6_final_model_summary.csv
+├── static
+│   ├── css
+│   └── js
+├── templates
+└── uploads

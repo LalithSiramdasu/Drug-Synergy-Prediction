@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynergyLens | Drug Synergy Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <header class="hero panel reveal">
+      <div class="hero-copy">
+        <div class="hero-topbar">
+          <span class="eyebrow">Precision Oncology Workspace</span>
+          <div class="theme-toggle-wrap">
+            <label for="switch" class="toggle" aria-label="Toggle dark mode">
+              <input type="checkbox" class="input" id="switch" aria-label="Toggle theme">
+              <div class="icon icon--moon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  width="32"
+                  height="32"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162z"
+                    clip-rule="evenodd"
+                  ></path>
+                </svg>
+              </div>
+              <div class="icon icon--sun">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  width="32"
+                  height="32"
+                >
+                  <path
+                    d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75zM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0zM18.894 6.166a.75.75 0 0 0-1.06-1.06l-1.591 1.59a.75.75 0 1 0 1.06 1.061l1.591-1.59zM21.75 12a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1 0-1.5H21a.75.75 0 0 1 .75.75zM17.834 18.894a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 1 0-1.061 1.06l1.59 1.591zM12 18a.75.75 0 0 1 .75.75V21a.75.75 0 0 1-1.5 0v-2.25A.75.75 0 0 1 12 18zM7.758 17.303a.75.75 0 0 0-1.061-1.06l-1.591 1.59a.75.75 0 0 0 1.06 1.061l1.591-1.59zM6 12a.75.75 0 0 1-.75.75H3a.75.75 0 0 1 0-1.5h2.25A.75.75 0 0 1 6 12zM6.697 7.757a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 0 0-1.061 1.06l1.59 1.591z"
+                  ></path>
+                </svg>
+              </div>
+            </label>
+          </div>
+        </div>
+        <h1>SynergyLens</h1>
+        <p class="hero-lead">
+          Predict drug-combination synergy, inspect SHAP feature impact, review compound metadata,
+          and process batch CSV files from one polished interface.
+        </p>
+        <div class="hero-actions">
+          <button type="button" class="ghost-button" data-view-trigger="predict">Start Prediction</button>
+          <button type="button" class="ghost-button ghost-button-secondary" data-view-trigger="about">About Project</button>
+        </div>
+      </div>
+
+      <div class="hero-metrics">
+        <article class="metric-card"><span class="metric-label">Drugs</span><strong id="metric-drugs" class="metric-value">--</strong><span class="metric-note">indexed compounds</span></article>
+        <article class="metric-card"><span class="metric-label">Cell Lines</span><strong id="metric-cell-lines" class="metric-value">--</strong><span class="metric-note">prediction contexts</span></article>
+        <article class="metric-card"><span class="metric-label">Feature Columns</span><strong id="metric-features" class="metric-value">--</strong><span class="metric-note">model input width</span></article>
+        <article class="metric-card metric-card--accent backend-health-card" id="backend-health-card">
+          <div class="health-card-top">
+            <span class="metric-label">Backend</span>
+            <span id="backend-status-badge" class="health-status-badge tone-neutral">Checking</span>
+          </div>
+          <strong id="backend-status-title" class="metric-value">Checking backend</strong>
+          <div class="health-stat-grid">
+            <span>available models: <strong id="metric-models">--</strong></span>
+            <span>available drugs: <strong id="health-drugs">--</strong></span>
+            <span>feature columns: <strong id="health-features">--</strong></span>
+          </div>
+          <span id="backend-status" class="metric-note">Waiting for /api/health</span>
+        </article>
+      </div>
+    </header>
+
+    <nav class="workspace-tabs panel reveal reveal-delay-1" aria-label="Workspace sections">
+      <button type="button" class="tab-button is-active" data-view="predict">Predict</button>
+      <button type="button" class="tab-button" data-view="explain">Explain</button>
+      <button type="button" class="tab-button" data-view="drugs">Drug Info</button>
+      <button type="button" class="tab-button" data-view="batch">Batch</button>
+      <button type="button" class="tab-button" data-view="about">About</button>
+    </nav>
+
+    <main class="workspace">
+      <section id="view-predict" class="view is-active">
+        <div class="workspace-grid workspace-grid--main">
+          <aside class="panel control-panel reveal">
+            <div class="section-header">
+              <span class="section-kicker">Model Input</span>
+              <h2 class="section-title">Synergy Prediction</h2>
+              <p class="section-copy">Choose two drugs and a biological setting to estimate their interaction score.</p>
+            </div>
+            <div id="predict-alert" class="inline-alert" hidden></div>
+            <div class="form-stack">
+              <div class="field-group autocomplete-wrap">
+                <label for="drug1-input">Drug 1</label>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="drug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="drug1-list" data-hidden-id="drug1-id"></div>
+                <input type="hidden" id="drug1-id">
+                <div class="autocomplete-list" id="drug1-list"></div>
+              </div>
+              <div class="field-group autocomplete-wrap">
+                <label for="drug2-input">Drug 2</label>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="drug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="drug2-list" data-hidden-id="drug2-id"></div>
+                <input type="hidden" id="drug2-id">
+                <div class="autocomplete-list" id="drug2-list"></div>
+              </div>
+              <div class="field-group">
+                <label for="cell-line">Cell Line</label>
+                <div class="select-shell">
+                  <select id="cell-line">
+                    <option value="">Loading cell lines...</option>
+                  </select>
+                </div>
+              </div>
+              <button type="button" class="primary-button" id="predict-btn"><span id="predict-btn-text">Predict Synergy</span><span id="predict-spinner" class="button-spinner" aria-hidden="true"></span></button>
+            </div>
+            <div class="demo-panel">
+              <div class="demo-heading">
+                <span class="section-kicker">Test Examples</span>
+                <h3>Load Demo Cases</h3>
+              </div>
+              <div id="demo-cases" class="demo-case-grid">
+                <div class="demo-loading">Loading demo cases...</div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="results-stack">
+            <article class="panel info-panel reveal reveal-delay-1">
+              <div class="mini-grid">
+                <div class="mini-card"><span class="mini-label">Select</span><strong>Drug Pair</strong><p>Fast autocomplete over the project drug library.</p></div>
+                <div class="mini-card"><span class="mini-label">Context</span><strong>Cell Model</strong><p>Attach a cell line; model selection is automatic.</p></div>
+                <div class="mini-card"><span class="mini-label">Interpret</span><strong>Score Band</strong><p>Read synergy, neutral, or antagonistic behavior quickly.</p></div>
+              </div>
+            </article>
+
+            <article class="panel result-panel reveal reveal-delay-2">
+              <div class="panel-header panel-header--spread">
+                <div>
+                  <span class="section-kicker">Output</span>
+                  <h2 class="section-title">Synergy Readout</h2>
+                  <p class="section-copy">Gauge, result label, and short interpretation.</p>
+                </div>
+                <span class="status-pill tone-neutral" id="score-pill">Awaiting input</span>
+              </div>
+
+              <div id="results-empty" class="empty-state">
+                <div class="empty-illustration"><div class="pulse-ring"></div><div class="pulse-core"></div></div>
+                <h3>No prediction yet</h3>
+                <p>Run a prediction to populate the model score and context summary.</p>
+              </div>
+
+              <div id="results-content" class="result-content" hidden>
+                <div class="gauge-card">
+                  <svg class="gauge-svg" viewBox="0 0 220 140" aria-hidden="true">
+                    <path class="gauge-track" d="M 28 110 A 82 82 0 0 1 192 110" pathLength="100"></path>
+                    <path id="gauge-arc" class="gauge-arc" d="M 28 110 A 82 82 0 0 1 192 110" pathLength="100"></path>
+                  </svg>
+                  <div class="gauge-value"><strong id="score-value">0.00</strong><span id="score-label">Awaiting input</span></div>
+                </div>
+                <div class="pair-banner">
+                  <div><span class="pair-label">Drug Pair</span><div class="pair-names"><strong id="r-drug1">Drug 1</strong><span>+</span><strong id="r-drug2">Drug 2</strong></div></div>
+                  <div class="pair-context"><span id="r-cell">Cell line</span><span id="r-cancer">Model context</span></div>
+                </div>
+                <div class="context-grid">
+                  <article class="context-tile"><span>Response</span><strong id="r-level">Pending</strong></article>
+                  <article class="context-tile"><span>Cell Line</span><strong id="r-cell-tile">Pending</strong></article>
+                  <article class="context-tile"><span>Model</span><strong id="r-cancer-tile">Pending</strong></article>
+                </div>
+                <article class="interpretation-card"><span class="section-kicker">Interpretation</span><p id="score-summary">The model interpretation will appear here after prediction.</p></article>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-explain" class="view">
+        <div class="workspace-grid workspace-grid--main">
+          <aside class="panel control-panel reveal">
+            <div class="section-header">
+              <span class="section-kicker">Explainability</span>
+              <h2 class="section-title">SHAP Feature Impact</h2>
+              <p class="section-copy">Use the same drug pair and context to inspect the features driving the score.</p>
+            </div>
+            <div id="explain-alert" class="inline-alert" hidden></div>
+            <div class="form-stack">
+              <div class="field-group autocomplete-wrap">
+                <label for="edrug1-input">Drug 1</label>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="edrug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="edrug1-list" data-hidden-id="edrug1-id"></div>
+                <input type="hidden" id="edrug1-id">
+                <div class="autocomplete-list" id="edrug1-list"></div>
+              </div>
+              <div class="field-group autocomplete-wrap">
+                <label for="edrug2-input">Drug 2</label>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="edrug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="edrug2-list" data-hidden-id="edrug2-id"></div>
+                <input type="hidden" id="edrug2-id">
+                <div class="autocomplete-list" id="edrug2-list"></div>
+              </div>
+              <div class="field-group">
+                <label for="ecell-line">Cell Line</label>
+                <div class="select-shell">
+                  <select id="ecell-line">
+                    <option value="">Loading cell lines...</option>
+                  </select>
+                </div>
+              </div>
+              <button type="button" class="primary-button" id="explain-btn"><span id="explain-btn-text">Generate Explanation</span><span id="explain-spinner" class="button-spinner" aria-hidden="true"></span></button>
+            </div>
+          </aside>
+
+          <article class="panel chart-panel reveal reveal-delay-1">
+            <div class="panel-header panel-header--spread">
+              <div>
+                <span class="section-kicker">Top Drivers</span>
+                <h2 class="section-title">Contribution Map</h2>
+                <p class="section-copy">Teal bars push the score downward toward synergy. Red bars push the score upward toward antagonism.</p>
+              </div>
+              <div class="legend-group"><span><i class="legend-swatch legend-swatch--synergy"></i> More synergistic</span><span><i class="legend-swatch legend-swatch--antagonism"></i> More antagonistic</span></div>
+            </div>
+            <div id="shap-empty" class="empty-state empty-state--compact"><h3>Explanation panel ready</h3><p>Run an explanation request to render the top SHAP features.</p></div>
+            <div id="shap-content" class="chart-content" hidden>
+              <div class="chart-shell"><canvas id="shap-chart"></canvas></div>
+              <div class="meta-grid">
+                <article class="meta-card"><span>Prediction</span><strong id="shap-prediction">--</strong></article>
+                <article class="meta-card"><span>Base Value</span><strong id="shap-base">--</strong></article>
+              </div>
+              <p id="shap-base-info" class="footnote">No explanation computed yet.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-drugs" class="view">
+        <div class="workspace-grid workspace-grid--main">
+          <aside class="panel control-panel reveal">
+            <div class="section-header">
+              <span class="section-kicker">Reference</span>
+              <h2 class="section-title">Compound Lookup</h2>
+              <p class="section-copy">Fetch structure images and molecular metadata for two compounds side by side.</p>
+            </div>
+            <div id="drug-alert" class="inline-alert" hidden></div>
+            <div class="form-stack">
+              <div class="field-group autocomplete-wrap">
+                <label for="ddrug1-input">Drug 1</label>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="ddrug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="ddrug1-list" data-hidden-id="ddrug1-id"></div>
+                <input type="hidden" id="ddrug1-id">
+                <div class="autocomplete-list" id="ddrug1-list"></div>
+              </div>
+              <div class="field-group autocomplete-wrap">
+                <label for="ddrug2-input">Drug 2</label>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="ddrug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="ddrug2-list" data-hidden-id="ddrug2-id"></div>
+                <input type="hidden" id="ddrug2-id">
+                <div class="autocomplete-list" id="ddrug2-list"></div>
+              </div>
+              <button type="button" class="primary-button" id="drug-info-btn"><span id="dinfo-btn-text">Load Drug Details</span><span id="dinfo-spinner" class="button-spinner" aria-hidden="true"></span></button>
+            </div>
+          </aside>
+
+          <article class="panel drug-panel reveal reveal-delay-1">
+            <div class="panel-header">
+              <span class="section-kicker">PubChem View</span>
+              <h2 class="section-title">Compound Profiles</h2>
+            </div>
+            <div id="drug-cards-area" class="drug-cards-grid">
+              <div class="empty-state empty-state--compact"><h3>No drug cards yet</h3><p>Load two compounds to compare molecular details.</p></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-batch" class="view">
+        <div class="batch-grid">
+          <article class="panel control-panel reveal">
+            <div class="section-header">
+              <span class="section-kicker">Batch Processing</span>
+              <h2 class="section-title">CSV Upload</h2>
+              <p class="section-copy">Upload a file and receive a downloadable prediction CSV with a live preview.</p>
+            </div>
+            <div id="batch-alert" class="inline-alert" hidden></div>
+            <label class="drop-zone" id="drop-zone" for="csv-file">
+              <input type="file" id="csv-file" accept=".csv" hidden>
+              <span class="drop-icon">CSV</span>
+              <strong id="drop-zone-title">Drop your file here</strong>
+              <p>or click to browse. Maximum upload size: 10 MB.</p>
+              <code>NSC1, NSC2, CELLNAME</code>
+            </label>
+          </article>
+
+          <article class="panel control-panel reveal reveal-delay-1">
+            <div class="section-header">
+              <span class="section-kicker">Checklist</span>
+              <h2 class="section-title">Expected Format</h2>
+            </div>
+            <div class="checklist">
+              <div class="check-item"><span>1</span><p>Include `NSC1`, `NSC2`, and `CELLNAME` in every CSV row.</p></div>
+              <div class="check-item"><span>2</span><p>Use NSC identifiers from the loaded project drug list.</p></div>
+              <div class="check-item"><span>3</span><p>The preview table below mirrors the prediction CSV saved by the backend.</p></div>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel batch-panel reveal reveal-delay-2">
+          <div class="panel-header panel-header--spread">
+            <div>
+              <span class="section-kicker">Results</span>
+              <h2 class="section-title">Batch Preview</h2>
+              <p class="section-copy">Summary stats and the first rows of the processed output.</p>
+            </div>
+            <button type="button" class="secondary-button" id="download-btn" disabled>Download CSV</button>
+          </div>
+          <div id="batch-result" class="batch-result">
+            <div class="batch-stats" id="batch-stats"></div>
+            <div class="table-shell"><table id="batch-table"><thead><tr id="batch-thead"></tr></thead><tbody id="batch-tbody"></tbody></table></div>
+          </div>
+          <div id="batch-empty" class="empty-state empty-state--compact"><h3>Batch results will appear here</h3><p>Process a CSV to unlock the preview and download action.</p></div>
+        </article>
+      </section>
+
+      <section id="view-about" class="view">
+        <article class="panel about-panel reveal">
+          <div class="panel-header">
+            <span class="section-kicker">Project Note</span>
+            <h2 class="section-title">NCI ALMANAC ComboScore Deployment</h2>
+            <p class="section-copy">SynergyLens is a Flask deployment app for final Step 6 models. It validates NSC inputs, builds the exact 526-feature model vector, selects the best model per cell line, predicts both drug orders, and averages the final ComboScore.</p>
+          </div>
+          <div class="about-grid">
+            <article class="mini-card">
+              <span class="mini-label">Target</span>
+              <strong>ComboScore</strong>
+              <p>Negative values indicate stronger predicted synergy. Positive values indicate antagonism.</p>
+            </article>
+            <article class="mini-card">
+              <span class="mini-label">Model</span>
+              <strong>Automatic Selection</strong>
+              <p>The backend uses the final Step 6 registry. Users never choose RandomForest, XGBoost, CatBoost, or LightGBM manually.</p>
+            </article>
+            <article class="mini-card">
+              <span class="mini-label">Safety</span>
+              <strong>Screening Only</strong>
+              <p>Predictions and SHAP explanations are prioritization support, not biological proof or clinical advice.</p>
+            </article>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
