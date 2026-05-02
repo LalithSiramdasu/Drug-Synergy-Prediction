@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SynergyLens | Drug Synergy Workspace</title>
+  <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -85,16 +86,16 @@
       </div>
     </header>
 
-    <nav class="workspace-tabs panel reveal reveal-delay-1" aria-label="Workspace sections">
-      <button type="button" class="tab-button is-active" data-view="predict">Predict</button>
-      <button type="button" class="tab-button" data-view="explain">Explain</button>
-      <button type="button" class="tab-button" data-view="drugs">Drug Info</button>
-      <button type="button" class="tab-button" data-view="batch">Batch</button>
-      <button type="button" class="tab-button" data-view="about">About</button>
+    <nav class="workspace-tabs panel reveal reveal-delay-1" aria-label="Workspace sections" role="tablist">
+      <button type="button" class="tab-button is-active" id="tab-predict" data-view="predict" role="tab" aria-controls="view-predict" aria-selected="true">Predict</button>
+      <button type="button" class="tab-button" id="tab-explain" data-view="explain" role="tab" aria-controls="view-explain" aria-selected="false">Explain</button>
+      <button type="button" class="tab-button" id="tab-drugs" data-view="drugs" role="tab" aria-controls="view-drugs" aria-selected="false">Drug Info</button>
+      <button type="button" class="tab-button" id="tab-batch" data-view="batch" role="tab" aria-controls="view-batch" aria-selected="false">Batch</button>
+      <button type="button" class="tab-button" id="tab-about" data-view="about" role="tab" aria-controls="view-about" aria-selected="false">About</button>
     </nav>
 
     <main class="workspace">
-      <section id="view-predict" class="view is-active">
+      <section id="view-predict" class="view is-active" role="tabpanel" aria-labelledby="tab-predict" aria-hidden="false">
         <div class="workspace-grid workspace-grid--main">
           <aside class="panel control-panel reveal">
             <div class="section-header">
@@ -102,29 +103,32 @@
               <h2 class="section-title">Synergy Prediction</h2>
               <p class="section-copy">Choose two drugs and a biological setting to estimate their interaction score.</p>
             </div>
-            <div id="predict-alert" class="inline-alert" hidden></div>
+            <div id="predict-alert" class="inline-alert" role="alert" hidden></div>
             <div class="form-stack">
               <div class="field-group autocomplete-wrap">
                 <label for="drug1-input">Drug 1</label>
-                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="drug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="drug1-list" data-hidden-id="drug1-id"></div>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="drug1-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="drug1-list drug1-validation" aria-describedby="drug1-validation" data-drug-search data-list-id="drug1-list" data-hidden-id="drug1-id"></div>
                 <input type="hidden" id="drug1-id">
-                <div class="autocomplete-list" id="drug1-list"></div>
+                <div class="autocomplete-list" id="drug1-list" role="listbox"></div>
+                <p id="drug1-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
               <div class="field-group autocomplete-wrap">
                 <label for="drug2-input">Drug 2</label>
-                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="drug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="drug2-list" data-hidden-id="drug2-id"></div>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="drug2-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="drug2-list drug2-validation" aria-describedby="drug2-validation" data-drug-search data-list-id="drug2-list" data-hidden-id="drug2-id"></div>
                 <input type="hidden" id="drug2-id">
-                <div class="autocomplete-list" id="drug2-list"></div>
+                <div class="autocomplete-list" id="drug2-list" role="listbox"></div>
+                <p id="drug2-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
               <div class="field-group">
                 <label for="cell-line">Cell Line</label>
                 <div class="select-shell">
-                  <select id="cell-line">
+                  <select id="cell-line" aria-describedby="cell-line-validation">
                     <option value="">Loading cell lines...</option>
                   </select>
                 </div>
+                <p id="cell-line-validation" class="validation-message is-neutral" aria-live="polite">Loading valid cell lines...</p>
               </div>
-              <button type="button" class="primary-button" id="predict-btn"><span id="predict-btn-text">Predict Synergy</span><span id="predict-spinner" class="button-spinner" aria-hidden="true"></span></button>
+              <button type="button" class="primary-button" id="predict-btn" disabled><span id="predict-btn-text">Predict Synergy</span><span id="predict-spinner" class="button-spinner" aria-hidden="true"></span></button>
             </div>
             <div class="demo-panel">
               <div class="demo-heading">
@@ -162,6 +166,11 @@
                 <p>Run a prediction to populate the model score and context summary.</p>
               </div>
 
+              <div id="prediction-loader" class="prediction-loader" hidden aria-live="polite" aria-busy="true">
+                <div class="prediction-loader-ring" aria-hidden="true"></div>
+                <p id="prediction-loader-message" class="prediction-loader-message">Validating inputs...</p>
+              </div>
+
               <div id="results-content" class="result-content" hidden>
                 <div class="gauge-card">
                   <svg class="gauge-svg" viewBox="0 0 220 140" aria-hidden="true">
@@ -169,6 +178,8 @@
                     <path id="gauge-arc" class="gauge-arc" d="M 28 110 A 82 82 0 0 1 192 110" pathLength="100"></path>
                   </svg>
                   <div class="gauge-value"><strong id="score-value">0.00</strong><span id="score-label">Awaiting input</span></div>
+                  <div class="gauge-axis" aria-hidden="true"><span>Strong antagonism</span><span>Neutral</span><span>Strong synergy</span></div>
+                  <p class="gauge-note">Display range is clamped for visualization.</p>
                 </div>
                 <div class="pair-banner">
                   <div><span class="pair-label">Drug Pair</span><div class="pair-names"><strong id="r-drug1">Drug 1</strong><span>+</span><strong id="r-drug2">Drug 2</strong></div></div>
@@ -179,14 +190,14 @@
                   <article class="context-tile"><span>Cell Line</span><strong id="r-cell-tile">Pending</strong></article>
                   <article class="context-tile"><span>Model</span><strong id="r-cancer-tile">Pending</strong></article>
                 </div>
-                <article class="interpretation-card"><span class="section-kicker">Interpretation</span><p id="score-summary">The model interpretation will appear here after prediction.</p></article>
+                <article class="interpretation-card"><span class="section-kicker">Interpretation</span><div id="score-summary" class="result-story">The model interpretation will appear here after prediction.</div></article>
               </div>
             </article>
           </div>
         </div>
       </section>
 
-      <section id="view-explain" class="view">
+      <section id="view-explain" class="view" role="tabpanel" aria-labelledby="tab-explain" aria-hidden="true">
         <div class="workspace-grid workspace-grid--main">
           <aside class="panel control-panel reveal">
             <div class="section-header">
@@ -194,29 +205,32 @@
               <h2 class="section-title">SHAP Feature Impact</h2>
               <p class="section-copy">Use the same drug pair and context to inspect the features driving the score.</p>
             </div>
-            <div id="explain-alert" class="inline-alert" hidden></div>
+            <div id="explain-alert" class="inline-alert" role="alert" hidden></div>
             <div class="form-stack">
               <div class="field-group autocomplete-wrap">
                 <label for="edrug1-input">Drug 1</label>
-                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="edrug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="edrug1-list" data-hidden-id="edrug1-id"></div>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="edrug1-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="edrug1-list edrug1-validation" aria-describedby="edrug1-validation" data-drug-search data-list-id="edrug1-list" data-hidden-id="edrug1-id"></div>
                 <input type="hidden" id="edrug1-id">
-                <div class="autocomplete-list" id="edrug1-list"></div>
+                <div class="autocomplete-list" id="edrug1-list" role="listbox"></div>
+                <p id="edrug1-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
               <div class="field-group autocomplete-wrap">
                 <label for="edrug2-input">Drug 2</label>
-                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="edrug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="edrug2-list" data-hidden-id="edrug2-id"></div>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="edrug2-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="edrug2-list edrug2-validation" aria-describedby="edrug2-validation" data-drug-search data-list-id="edrug2-list" data-hidden-id="edrug2-id"></div>
                 <input type="hidden" id="edrug2-id">
-                <div class="autocomplete-list" id="edrug2-list"></div>
+                <div class="autocomplete-list" id="edrug2-list" role="listbox"></div>
+                <p id="edrug2-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
               <div class="field-group">
                 <label for="ecell-line">Cell Line</label>
                 <div class="select-shell">
-                  <select id="ecell-line">
+                  <select id="ecell-line" aria-describedby="ecell-line-validation">
                     <option value="">Loading cell lines...</option>
                   </select>
                 </div>
+                <p id="ecell-line-validation" class="validation-message is-neutral" aria-live="polite">Loading valid cell lines...</p>
               </div>
-              <button type="button" class="primary-button" id="explain-btn"><span id="explain-btn-text">Generate Explanation</span><span id="explain-spinner" class="button-spinner" aria-hidden="true"></span></button>
+              <button type="button" class="primary-button" id="explain-btn" disabled><span id="explain-btn-text">Generate Explanation</span><span id="explain-spinner" class="button-spinner" aria-hidden="true"></span></button>
             </div>
           </aside>
 
@@ -225,11 +239,15 @@
               <div>
                 <span class="section-kicker">Top Drivers</span>
                 <h2 class="section-title">Contribution Map</h2>
-                <p class="section-copy">Teal bars push the score downward toward synergy. Red bars push the score upward toward antagonism.</p>
+                <p class="section-copy">Teal bars push the ComboScore upward toward synergy. Red bars pull the ComboScore downward toward antagonism.</p>
               </div>
               <div class="legend-group"><span><i class="legend-swatch legend-swatch--synergy"></i> More synergistic</span><span><i class="legend-swatch legend-swatch--antagonism"></i> More antagonistic</span></div>
             </div>
             <div id="shap-empty" class="empty-state empty-state--compact"><h3>Explanation panel ready</h3><p>Run an explanation request to render the top SHAP features.</p></div>
+            <div id="explain-loader" class="prediction-loader inline-loader" hidden aria-live="polite" aria-busy="true">
+              <div class="prediction-loader-ring" aria-hidden="true"></div>
+              <p id="explain-loader-message" class="prediction-loader-message">Validating prediction input...</p>
+            </div>
             <div id="shap-content" class="chart-content" hidden>
               <div class="chart-shell"><canvas id="shap-chart"></canvas></div>
               <div class="meta-grid">
@@ -242,7 +260,7 @@
         </div>
       </section>
 
-      <section id="view-drugs" class="view">
+      <section id="view-drugs" class="view" role="tabpanel" aria-labelledby="tab-drugs" aria-hidden="true">
         <div class="workspace-grid workspace-grid--main">
           <aside class="panel control-panel reveal">
             <div class="section-header">
@@ -250,21 +268,23 @@
               <h2 class="section-title">Compound Lookup</h2>
               <p class="section-copy">Fetch structure images and molecular metadata for two compounds side by side.</p>
             </div>
-            <div id="drug-alert" class="inline-alert" hidden></div>
+            <div id="drug-alert" class="inline-alert" role="alert" hidden></div>
             <div class="form-stack">
               <div class="field-group autocomplete-wrap">
                 <label for="ddrug1-input">Drug 1</label>
-                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="ddrug1-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="ddrug1-list" data-hidden-id="ddrug1-id"></div>
+                <div class="input-shell"><span class="input-chip">D1</span><input type="text" id="ddrug1-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="ddrug1-list ddrug1-validation" aria-describedby="ddrug1-validation" data-drug-search data-list-id="ddrug1-list" data-hidden-id="ddrug1-id"></div>
                 <input type="hidden" id="ddrug1-id">
-                <div class="autocomplete-list" id="ddrug1-list"></div>
+                <div class="autocomplete-list" id="ddrug1-list" role="listbox"></div>
+                <p id="ddrug1-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
               <div class="field-group autocomplete-wrap">
                 <label for="ddrug2-input">Drug 2</label>
-                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="ddrug2-input" placeholder="Search NSC" autocomplete="off" data-drug-search data-list-id="ddrug2-list" data-hidden-id="ddrug2-id"></div>
+                <div class="input-shell"><span class="input-chip">D2</span><input type="text" id="ddrug2-input" placeholder="Search NSC" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="ddrug2-list ddrug2-validation" aria-describedby="ddrug2-validation" data-drug-search data-list-id="ddrug2-list" data-hidden-id="ddrug2-id"></div>
                 <input type="hidden" id="ddrug2-id">
-                <div class="autocomplete-list" id="ddrug2-list"></div>
+                <div class="autocomplete-list" id="ddrug2-list" role="listbox"></div>
+                <p id="ddrug2-validation" class="validation-message is-neutral" aria-live="polite">Loading valid drugs...</p>
               </div>
-              <button type="button" class="primary-button" id="drug-info-btn"><span id="dinfo-btn-text">Load Drug Details</span><span id="dinfo-spinner" class="button-spinner" aria-hidden="true"></span></button>
+              <button type="button" class="primary-button" id="drug-info-btn" disabled><span id="dinfo-btn-text">Load Drug Details</span><span id="dinfo-spinner" class="button-spinner" aria-hidden="true"></span></button>
             </div>
           </aside>
 
@@ -273,6 +293,10 @@
               <span class="section-kicker">PubChem View</span>
               <h2 class="section-title">Compound Profiles</h2>
             </div>
+            <div id="drug-loader" class="prediction-loader inline-loader" hidden aria-live="polite" aria-busy="true">
+              <div class="prediction-loader-ring" aria-hidden="true"></div>
+              <p id="drug-loader-message" class="prediction-loader-message">Validating drug NSC values...</p>
+            </div>
             <div id="drug-cards-area" class="drug-cards-grid">
               <div class="empty-state empty-state--compact"><h3>No drug cards yet</h3><p>Load two compounds to compare molecular details.</p></div>
             </div>
@@ -280,7 +304,7 @@
         </div>
       </section>
 
-      <section id="view-batch" class="view">
+      <section id="view-batch" class="view" role="tabpanel" aria-labelledby="tab-batch" aria-hidden="true">
         <div class="batch-grid">
           <article class="panel control-panel reveal">
             <div class="section-header">
@@ -288,7 +312,7 @@
               <h2 class="section-title">CSV Upload</h2>
               <p class="section-copy">Upload a file and receive a downloadable prediction CSV with a live preview.</p>
             </div>
-            <div id="batch-alert" class="inline-alert" hidden></div>
+            <div id="batch-alert" class="inline-alert" role="alert" hidden></div>
             <label class="drop-zone" id="drop-zone" for="csv-file">
               <input type="file" id="csv-file" accept=".csv" hidden>
               <span class="drop-icon">CSV</span>
@@ -296,6 +320,10 @@
               <p>or click to browse. Maximum upload size: 10 MB.</p>
               <code>NSC1, NSC2, CELLNAME</code>
             </label>
+            <button type="button" class="primary-button batch-run-button" id="batch-run-btn" disabled>
+              <span id="batch-run-btn-text">Run Batch Prediction</span>
+              <span id="batch-run-spinner" class="button-spinner" aria-hidden="true"></span>
+            </button>
           </article>
 
           <article class="panel control-panel reveal reveal-delay-1">
@@ -320,6 +348,10 @@
             </div>
             <button type="button" class="secondary-button" id="download-btn" disabled>Download CSV</button>
           </div>
+          <div id="batch-loader" class="prediction-loader inline-loader" hidden aria-live="polite" aria-busy="true">
+            <div class="prediction-loader-ring" aria-hidden="true"></div>
+            <p id="batch-loader-message" class="prediction-loader-message">Reading uploaded CSV...</p>
+          </div>
           <div id="batch-result" class="batch-result">
             <div class="batch-stats" id="batch-stats"></div>
             <div class="table-shell"><table id="batch-table"><thead><tr id="batch-thead"></tr></thead><tbody id="batch-tbody"></tbody></table></div>
@@ -328,7 +360,7 @@
         </article>
       </section>
 
-      <section id="view-about" class="view">
+      <section id="view-about" class="view" role="tabpanel" aria-labelledby="tab-about" aria-hidden="true">
         <article class="panel about-panel reveal">
           <div class="panel-header">
             <span class="section-kicker">Project Note</span>
@@ -339,7 +371,7 @@
             <article class="mini-card">
               <span class="mini-label">Target</span>
               <strong>ComboScore</strong>
-              <p>Negative values indicate stronger predicted synergy. Positive values indicate antagonism.</p>
+              <p>Positive values suggest stronger-than-expected inhibition and synergy. Negative values suggest antagonism.</p>
             </article>
             <article class="mini-card">
               <span class="mini-label">Model</span>

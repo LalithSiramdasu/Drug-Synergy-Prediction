@@ -17,26 +17,96 @@ const state = {
   drugs: [],
   drugIds: new Set(),
   cellLines: [],
+  drugsLoaded: false,
+  cellLinesLoaded: false,
+  drugLoadError: "",
+  cellLineLoadError: "",
   demos: [],
-  lastPrediction: null
+  lastPrediction: null,
+  lastExplanation: null,
+  selectedBatchFile: null,
+  lastBatchRendered: false,
+  inlineLoaders: {}
 };
 
 const autocompleteTimers = {};
 const THEME_STORAGE_KEY = "synergylens-theme";
+const PREDICTION_FLOW_MESSAGES = [
+  "Validating inputs",
+  "Building 526-feature vector",
+  "Selecting best cell-line model",
+  "Running NSC1 \u2192 NSC2 prediction",
+  "Running NSC2 \u2192 NSC1 prediction",
+  "Averaging ComboScore",
+  "Preparing result"
+];
+const EXPLAIN_FLOW_MESSAGES = [
+  "Validating prediction input",
+  "Loading selected cell-line model",
+  "Building 526-feature vector",
+  "Computing SHAP explanation",
+  "Ranking top molecular contributors",
+  "Preparing explainable AI story"
+];
+const BATCH_FLOW_MESSAGES = [
+  "Reading uploaded CSV",
+  "Validating required columns",
+  "Checking drug and cell-line availability",
+  "Running predictions row by row",
+  "Saving batch output CSV",
+  "Preparing download link"
+];
+const DRUG_INFO_FLOW_MESSAGES = [
+  "Validating drug NSC values",
+  "Resolving molecule aliases",
+  "Loading molecule structures",
+  "Generating RDKit SVG structures",
+  "Preparing compound profile cards"
+];
 const DEMO_ORDER = ["strong_synergy", "neutral", "antagonism"];
 const DEMO_TITLES = {
   strong_synergy: "Strong Synergy",
   neutral: "Neutral",
   antagonism: "Antagonism"
 };
+const VALIDATION_GROUPS = {
+  predict: {
+    buttonId: "predict-btn",
+    drugFields: [
+      { inputId: "drug1-input", hiddenId: "drug1-id", messageId: "drug1-validation" },
+      { inputId: "drug2-input", hiddenId: "drug2-id", messageId: "drug2-validation" }
+    ],
+    cellField: { selectId: "cell-line", messageId: "cell-line-validation" }
+  },
+  explain: {
+    buttonId: "explain-btn",
+    drugFields: [
+      { inputId: "edrug1-input", hiddenId: "edrug1-id", messageId: "edrug1-validation" },
+      { inputId: "edrug2-input", hiddenId: "edrug2-id", messageId: "edrug2-validation" }
+    ],
+    cellField: { selectId: "ecell-line", messageId: "ecell-line-validation" }
+  },
+  drugs: {
+    buttonId: "drug-info-btn",
+    drugFields: [
+      { inputId: "ddrug1-input", hiddenId: "ddrug1-id", messageId: "ddrug1-validation" },
+      { inputId: "ddrug2-input", hiddenId: "ddrug2-id", messageId: "ddrug2-validation" }
+    ]
+  }
+};
+const NEUTRAL_THRESHOLD = 20;
+const SCORE_DISPLAY_MIN = -500;
+const SCORE_DISPLAY_MAX = 500;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindThemeToggle();
   document.body.classList.add("is-ready");
   bindViewNavigation();
   bindAutocomplete();
+  bindLiveValidation();
   bindActions();
   bindBatchUpload();
+  refreshAllValidation();
   bootstrapBackendData();
 });
 
@@ -92,11 +162,15 @@ function applyTheme(theme) {
 
 function switchView(viewName) {
   document.querySelectorAll(".view").forEach((view) => {
-    view.classList.toggle("is-active", view.id === `view-${viewName}`);
+    const isActive = view.id === `view-${viewName}`;
+    view.classList.toggle("is-active", isActive);
+    view.setAttribute("aria-hidden", String(!isActive));
   });
 
   document.querySelectorAll("[data-view]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.view === viewName);
+    const isActive = button.dataset.view === viewName;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
   });
 }
 
@@ -188,12 +262,18 @@ async function loadDrugs() {
     const data = await apiJson(API.drugs);
     state.drugs = normalizeDrugList(data);
     state.drugIds = new Set(state.drugs.map((drug) => drug.id));
+    state.drugsLoaded = true;
+    state.drugLoadError = "";
     refreshOpenAutocompleteLists();
     if (state.drugs.length && document.getElementById("metric-drugs")?.textContent === "--") {
       setText("metric-drugs", state.drugs.length);
     }
   } catch (error) {
+    state.drugsLoaded = false;
+    state.drugLoadError = error.message;
     showAlert("predict-alert", `Drug list failed to load: ${error.message}`);
+  } finally {
+    refreshAllValidation();
   }
 }
 
@@ -218,15 +298,21 @@ async function loadCellLines() {
   try {
     const data = await apiJson(API.cellLines);
     state.cellLines = normalizeCellLineList(data);
+    state.cellLinesLoaded = true;
+    state.cellLineLoadError = "";
     fillCellLineSelect("cell-line", state.cellLines);
     fillCellLineSelect("ecell-line", state.cellLines);
     if (state.cellLines.length && document.getElementById("metric-cell-lines")?.textContent === "--") {
       setText("metric-cell-lines", state.cellLines.length);
     }
   } catch (error) {
+    state.cellLinesLoaded = false;
+    state.cellLineLoadError = error.message;
     fillCellLineSelect("cell-line", [], "Cell lines unavailable");
     fillCellLineSelect("ecell-line", [], "Cell lines unavailable");
     showAlert("predict-alert", `Cell-line list failed to load: ${error.message}`);
+  } finally {
+    refreshAllValidation();
   }
 }
 
@@ -243,9 +329,13 @@ function fillCellLineSelect(id, values, placeholder = "Select a cell line") {
     return;
   }
 
+  const previousValue = select.value;
   select.innerHTML = [`<option value="">${escapeHtml(placeholder)}</option>`]
     .concat(values.map((value) => `<option value="${escapeAttribute(value)}">${escapeHtml(value)}</option>`))
     .join("");
+  if (previousValue && values.includes(previousValue)) {
+    select.value = previousValue;
+  }
 }
 
 async function loadDemoCases() {
@@ -343,6 +433,7 @@ function fillDemoCase(demo, options = {}) {
     const hidden = document.getElementById(hiddenId);
     if (input && (!preserveExisting || !input.value) && value !== undefined && value !== null) {
       input.value = `NSC ${value}`;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     }
     if (hidden && (!preserveExisting || !hidden.value) && value !== undefined && value !== null) {
       hidden.value = String(value);
@@ -352,6 +443,8 @@ function fillDemoCase(demo, options = {}) {
   setSelectValueWhenAvailable("cell-line", demo.CELLNAME, preserveExisting);
   setSelectValueWhenAvailable("ecell-line", demo.CELLNAME, preserveExisting);
   clearAlert("predict-alert");
+  refreshAllValidation();
+  window.setTimeout(refreshAllValidation, 300);
   if (!preserveExisting) {
     switchView("predict");
     document.getElementById("predict-btn")?.focus();
@@ -374,6 +467,7 @@ function setSelectValueWhenAvailable(id, value, preserveExisting = false) {
     }
     if (Array.from(select.options).some((option) => option.value === value)) {
       select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
     }
   };
 
@@ -437,14 +531,14 @@ function refreshOpenAutocompleteLists() {
 
 function renderAutocompleteMessage(list, message) {
   list.innerHTML = `<div class="autocomplete-message">${escapeHtml(message)}</div>`;
-  list.classList.add("is-open");
+  setAutocompleteOpen(list, true);
 }
 
 function renderDrugAutocomplete(list, input, hidden, matches) {
   list.innerHTML = "";
 
   if (!matches.length) {
-    list.classList.remove("is-open");
+    setAutocompleteOpen(list, false);
     return;
   }
 
@@ -452,6 +546,7 @@ function renderDrugAutocomplete(list, input, hidden, matches) {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "autocomplete-item";
+    item.setAttribute("role", "option");
     item.innerHTML = `
       <span>${escapeHtml(drug.name)}</span>
       <span class="autocomplete-id">${escapeHtml(drug.id)}</span>
@@ -459,13 +554,21 @@ function renderDrugAutocomplete(list, input, hidden, matches) {
     item.addEventListener("click", () => {
       input.value = drug.name;
       hidden.value = drug.id;
-      list.classList.remove("is-open");
+      setAutocompleteOpen(list, false);
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });
     list.appendChild(item);
   });
 
-  list.classList.add("is-open");
+  setAutocompleteOpen(list, true);
+}
+
+function setAutocompleteOpen(list, isOpen) {
+  list.classList.toggle("is-open", isOpen);
+  const input = document.querySelector(`[data-list-id="${list.id}"]`);
+  if (input) {
+    input.setAttribute("aria-expanded", String(isOpen));
+  }
 }
 
 function syncDrugInputWithKnownValue(input) {
@@ -478,20 +581,135 @@ function syncDrugInputWithKnownValue(input) {
     if (resolvedId) {
       hidden.value = resolvedId;
       input.value = `NSC ${resolvedId}`;
+      refreshAllValidation();
     }
   }, 120);
 }
 
 function closeAllAutocomplete() {
   document.querySelectorAll(".autocomplete-list").forEach((list) => {
-    list.classList.remove("is-open");
+    setAutocompleteOpen(list, false);
   });
+}
+
+function bindLiveValidation() {
+  document.querySelectorAll("[data-drug-search]").forEach((input) => {
+    input.addEventListener("input", refreshAllValidation);
+    input.addEventListener("change", refreshAllValidation);
+    input.addEventListener("blur", () => window.setTimeout(refreshAllValidation, 140));
+  });
+
+  ["cell-line", "ecell-line"].forEach((id) => {
+    const select = document.getElementById(id);
+    if (select) {
+      select.addEventListener("change", refreshAllValidation);
+      select.addEventListener("input", refreshAllValidation);
+    }
+  });
+}
+
+function refreshAllValidation() {
+  const results = {};
+  Object.entries(VALIDATION_GROUPS).forEach(([name, config]) => {
+    const groupResult = validateGroup(config);
+    results[name] = groupResult.valid;
+    setActionAvailability(config.buttonId, groupResult.valid);
+  });
+  return results;
+}
+
+function validateGroup(config) {
+  const drugResults = config.drugFields.map((field) => validateDrugField(field));
+  const cellResult = config.cellField ? validateCellLineField(config.cellField) : { valid: true };
+  return {
+    valid: drugResults.every((result) => result.valid) && cellResult.valid,
+    drugResults,
+    cellResult
+  };
+}
+
+function validateDrugField({ inputId, hiddenId, messageId }) {
+  const input = document.getElementById(inputId);
+  const hidden = document.getElementById(hiddenId);
+  const rawValue = input?.value?.trim() || "";
+
+  if (!state.drugsLoaded) {
+    return setValidationState(input, messageId, false, "neutral", state.drugLoadError ? "Drug list unavailable" : "Loading valid drugs...");
+  }
+
+  if (!rawValue) {
+    if (hidden) {
+      hidden.value = "";
+    }
+    return setValidationState(input, messageId, false, "neutral", "Required field");
+  }
+
+  const resolvedId = resolveKnownDrugId(rawValue);
+  if (!resolvedId) {
+    if (hidden) {
+      hidden.value = "";
+    }
+    return setValidationState(input, messageId, false, "invalid", "Unknown drug");
+  }
+
+  if (hidden) {
+    hidden.value = resolvedId;
+  }
+  if (input && input.value !== `NSC ${resolvedId}` && /^\d+$/.test(rawValue)) {
+    input.value = `NSC ${resolvedId}`;
+  }
+  return setValidationState(input, messageId, true, "valid", "Available drug");
+}
+
+function validateCellLineField({ selectId, messageId }) {
+  const select = document.getElementById(selectId);
+  const value = select?.value?.trim() || "";
+
+  if (!state.cellLinesLoaded) {
+    return setValidationState(select, messageId, false, "neutral", state.cellLineLoadError ? "Cell-line list unavailable" : "Loading valid cell lines...");
+  }
+
+  if (!value) {
+    return setValidationState(select, messageId, false, "neutral", "Required field");
+  }
+
+  if (!state.cellLines.includes(value)) {
+    return setValidationState(select, messageId, false, "invalid", "Unknown cell line");
+  }
+
+  return setValidationState(select, messageId, true, "valid", "Available cell line");
+}
+
+function setValidationState(input, messageId, isValid, tone, message) {
+  const fieldGroup = input?.closest(".field-group");
+  if (fieldGroup) {
+    fieldGroup.classList.remove("is-valid", "is-invalid", "is-neutral");
+    fieldGroup.classList.add(isValid ? "is-valid" : tone === "invalid" ? "is-invalid" : "is-neutral");
+  }
+
+  const messageElement = document.getElementById(messageId);
+  if (messageElement) {
+    messageElement.textContent = message;
+    messageElement.classList.remove("is-valid", "is-invalid", "is-neutral");
+    messageElement.classList.add(`is-${tone}`);
+  }
+
+  return { valid: isValid, message, tone };
+}
+
+function setActionAvailability(buttonId, isEnabled) {
+  const button = document.getElementById(buttonId);
+  if (!button || button.classList.contains("is-loading")) {
+    return;
+  }
+  button.disabled = !isEnabled;
 }
 
 function bindActions() {
   document.getElementById("predict-btn")?.addEventListener("click", runPredict);
   document.getElementById("explain-btn")?.addEventListener("click", runExplain);
   document.getElementById("drug-info-btn")?.addEventListener("click", loadDrugInfo);
+  document.getElementById("batch-run-btn")?.addEventListener("click", runSelectedBatchFile);
   document.getElementById("download-btn")?.addEventListener("click", downloadBatchResults);
 }
 
@@ -516,14 +734,14 @@ function bindBatchUpload() {
     zone.classList.remove("is-dragging");
     const file = event.dataTransfer.files[0];
     if (file) {
-      processBatchFile(file);
+      stageBatchFile(file);
     }
   });
 
   input.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) {
-      processBatchFile(file);
+      stageBatchFile(file);
     }
   });
 }
@@ -531,13 +749,22 @@ function bindBatchUpload() {
 async function runPredict() {
   clearAlert("predict-alert");
 
+  const validation = refreshAllValidation();
+  if (!validation.predict) {
+    stopPredictionLoader({ restorePanel: true });
+    showAlert("predict-alert", "Select valid drugs and a valid cell line before running prediction.");
+    return;
+  }
+
   const payload = buildModelPayload("drug1-id", "drug1-input", "drug2-id", "drug2-input", "cell-line");
   if (!payload) {
-    showAlert("predict-alert", "Select both NSC drugs and a cell line before running the prediction.");
+    stopPredictionLoader({ restorePanel: true });
+    showAlert("predict-alert", getPredictionInputError("drug1-input", "drug2-input", "cell-line"));
     return;
   }
 
   setButtonLoading("predict-btn", "predict-btn-text", true, "Predict Synergy", "Running model");
+  startPredictionLoader();
 
   try {
     const data = await apiJson(API.predict, {
@@ -547,12 +774,132 @@ async function runPredict() {
     });
     const prediction = normalizePredictionResponse(data, payload);
     state.lastPrediction = prediction;
+    stopPredictionLoader();
     renderPrediction(prediction);
     syncSelectionsFromPredict();
   } catch (error) {
+    stopPredictionLoader({ restorePanel: true });
     showAlert("predict-alert", error.message);
   } finally {
     setButtonLoading("predict-btn", "predict-btn-text", false, "Predict Synergy", "Running model");
+    refreshAllValidation();
+  }
+}
+
+function startPredictionLoader() {
+  const empty = document.getElementById("results-empty");
+  const content = document.getElementById("results-content");
+
+  if (empty) {
+    empty.hidden = true;
+  }
+  if (content) {
+    content.hidden = true;
+  }
+
+  const pill = document.getElementById("score-pill");
+  if (pill) {
+    setToneClass(pill, "neutral");
+    pill.textContent = "Running model";
+  }
+
+  startInlineLoader("prediction", PREDICTION_FLOW_MESSAGES);
+}
+
+function stopPredictionLoader(options = {}) {
+  const restorePanel = Boolean(options.restorePanel);
+
+  stopInlineLoader("prediction");
+  if (restorePanel) {
+    restorePredictionPanel();
+  }
+}
+
+function startInlineLoader(name, messages) {
+  const loader = document.getElementById(`${name}-loader`);
+  if (!loader) {
+    return;
+  }
+
+  clearInlineLoader(name);
+  state.inlineLoaders[name] = {
+    index: 0,
+    messages: [...messages],
+    timer: null
+  };
+  setInlineLoaderMessage(name);
+  loader.hidden = false;
+
+  state.inlineLoaders[name].timer = window.setInterval(() => {
+    const loaderState = state.inlineLoaders[name];
+    if (!loaderState) {
+      return;
+    }
+    loaderState.index = (loaderState.index + 1) % loaderState.messages.length;
+    setInlineLoaderMessage(name);
+  }, 700);
+}
+
+function stopInlineLoader(name) {
+  clearInlineLoader(name);
+  const loader = document.getElementById(`${name}-loader`);
+  if (loader) {
+    loader.hidden = true;
+  }
+}
+
+function clearInlineLoader(name) {
+  const loaderState = state.inlineLoaders[name];
+  if (loaderState?.timer) {
+    window.clearInterval(loaderState.timer);
+  }
+  delete state.inlineLoaders[name];
+}
+
+function setInlineLoaderMessage(name) {
+  const loaderState = state.inlineLoaders[name];
+  const message = document.getElementById(`${name}-loader-message`);
+  if (!loaderState || !message) {
+    return;
+  }
+
+  message.classList.remove("is-active");
+  // Restart the small text animation each time the flow advances.
+  void message.offsetWidth;
+  message.textContent = `${loaderState.messages[loaderState.index]}...`;
+  message.classList.add("is-active");
+}
+
+function restorePredictionPanel() {
+  const empty = document.getElementById("results-empty");
+  const content = document.getElementById("results-content");
+
+  if (state.lastPrediction) {
+    if (empty) {
+      empty.hidden = true;
+    }
+    if (content) {
+      content.hidden = false;
+    }
+    const pill = document.getElementById("score-pill");
+    if (pill) {
+      setToneClass(pill, state.lastPrediction.level);
+      pill.textContent = state.lastPrediction.label;
+    }
+    return;
+  }
+
+  if (empty) {
+    empty.hidden = false;
+  }
+  if (content) {
+    content.hidden = true;
+  }
+
+  const pill = document.getElementById("score-pill");
+  if (pill) {
+    setToneClass(pill, "neutral");
+    pill.textContent = "Awaiting input";
   }
 }
 
@@ -581,6 +928,59 @@ function buildModelPayload(drug1Hidden, drug1Input, drug2Hidden, drug2Input, cel
     drug2_id: String(nsc2),
     cell_line: cellLine
   };
+}
+
+function getPredictionInputError(drug1Input, drug2Input, cellSelect) {
+  const drug1Text = document.getElementById(drug1Input)?.value?.trim() || "";
+  const drug2Text = document.getElementById(drug2Input)?.value?.trim() || "";
+  const cellLine = document.getElementById(cellSelect)?.value || "";
+
+  if (!drug1Text || !drug2Text || !cellLine) {
+    return "Select both valid NSC drugs and a cell line before running the prediction.";
+  }
+
+  const drug1Candidate = extractDrugCandidate(drug1Text);
+  const drug2Candidate = extractDrugCandidate(drug2Text);
+  if (state.drugIds.size && (!drug1Candidate || !state.drugIds.has(drug1Candidate))) {
+    return `Drug 1 NSC ${drug1Candidate || drug1Text} is not in the loaded valid drug list.`;
+  }
+  if (state.drugIds.size && (!drug2Candidate || !state.drugIds.has(drug2Candidate))) {
+    return `Drug 2 NSC ${drug2Candidate || drug2Text} is not in the loaded valid drug list.`;
+  }
+  if (state.cellLines.length && !state.cellLines.includes(cellLine)) {
+    return `Cell line ${cellLine} is not in the loaded valid cell-line list.`;
+  }
+
+  return "Select both valid NSC drugs and a cell line before running the prediction.";
+}
+
+function getDrugInfoInputError(drug1Input, drug2Input) {
+  const drug1Text = document.getElementById(drug1Input)?.value?.trim() || "";
+  const drug2Text = document.getElementById(drug2Input)?.value?.trim() || "";
+
+  if (!drug1Text || !drug2Text) {
+    return "Select two valid NSC drugs before loading compound details.";
+  }
+
+  const drug1Candidate = extractDrugCandidate(drug1Text);
+  const drug2Candidate = extractDrugCandidate(drug2Text);
+  if (state.drugIds.size && (!drug1Candidate || !state.drugIds.has(drug1Candidate))) {
+    return `Drug 1 NSC ${drug1Candidate || drug1Text} is not in the loaded valid drug list.`;
+  }
+  if (state.drugIds.size && (!drug2Candidate || !state.drugIds.has(drug2Candidate))) {
+    return `Drug 2 NSC ${drug2Candidate || drug2Text} is not in the loaded valid drug list.`;
+  }
+
+  return "Select two valid NSC drugs before loading compound details.";
+}
+
+function extractDrugCandidate(value) {
+  const text = String(value ?? "").trim();
+  if (/^\d+$/.test(text)) {
+    return text;
+  }
+  const match = text.match(/\b(\d{2,})\b/);
+  return match ? match[1] : "";
 }
 
 function normalizePredictionResponse(data, payload) {
@@ -612,8 +1012,8 @@ function normalizePredictionResponse(data, payload) {
     reverse: data.prediction_NSC2_to_NSC1,
     explanation: data.explanation || "",
     suggestion: data.suggestion || "",
-    gaugeMin: Number(data.gauge_min ?? -1200),
-    gaugeMax: Number(data.gauge_max ?? 700)
+    gaugeMin: SCORE_DISPLAY_MIN,
+    gaugeMax: SCORE_DISPLAY_MAX
   };
 }
 
@@ -632,7 +1032,7 @@ function renderPrediction(data) {
   setText("r-level", data.label);
   setText("r-cell-tile", data.cellLine);
   setText("r-cancer-tile", data.model || "Auto-selected model");
-  setText("score-summary", buildInterpretationSummary(data));
+  renderPredictionStory(data);
 
   const pill = document.getElementById("score-pill");
   setToneClass(pill, data.level);
@@ -641,24 +1041,80 @@ function renderPrediction(data) {
   setGauge(data.score, data.color, data.gaugeMin, data.gaugeMax);
 }
 
-function buildInterpretationSummary(data) {
-  const parts = [];
-  parts.push(`The final averaged ComboScore is ${formatScore(data.score, 3)} for ${data.cellLine}.`);
-  if (data.model) {
-    parts.push(`The backend selected ${data.model} from the final Step 6 registry.`);
+function renderPredictionStory(data) {
+  const container = document.getElementById("score-summary");
+  if (!container) {
+    return;
   }
-  if (Number.isFinite(Number(data.forward)) && Number.isFinite(Number(data.reverse))) {
-    parts.push(`Forward prediction: ${formatScore(data.forward, 3)}. Reverse prediction: ${formatScore(data.reverse, 3)}.`);
+
+  container.innerHTML = buildPredictionStoryHtml(data);
+}
+
+function buildPredictionStoryHtml(data) {
+  const storyLabel = storyLabelForPrediction(data.label, data.score);
+  const forward = formatScore(data.forward, 3);
+  const reverse = formatScore(data.reverse, 3);
+  const finalScore = formatScore(data.score, 3);
+  const scoreMeaning = scoreMeaningForScore(data.score);
+
+  return `
+    <p>
+      SynergyLens evaluated the drug pair <strong>NSC ${escapeHtml(String(data.nsc1))}</strong> and
+      <strong>NSC ${escapeHtml(String(data.nsc2))}</strong> for the
+      <strong>${escapeHtml(data.cellLine)}</strong> cell line. The final readout below summarizes
+      what the predicted ComboScore represents for this pair.
+    </p>
+    <div class="story-score-grid">
+      <div><span>NSC ${escapeHtml(String(data.nsc1))} -&gt; NSC ${escapeHtml(String(data.nsc2))}</span><strong>${escapeHtml(forward)}</strong></div>
+      <div><span>NSC ${escapeHtml(String(data.nsc2))} -&gt; NSC ${escapeHtml(String(data.nsc1))}</span><strong>${escapeHtml(reverse)}</strong></div>
+      <div><span>Final averaged ComboScore</span><strong>${escapeHtml(finalScore)}</strong></div>
+      <div><span>Final label</span><strong>${escapeHtml(storyLabel)}</strong></div>
+    </div>
+    <p>
+      The same pair was scored in both drug orders because combination features are order-sensitive.
+      Averaging those two directional scores gives the final ComboScore.
+      This result is <strong>${escapeHtml(storyLabel)}</strong>: ${escapeHtml(scoreMeaning)}
+      Positive ComboScore suggests synergy, near zero suggests neutral or additive behavior,
+      and negative ComboScore suggests antagonism.
+    </p>
+    <p class="story-safety">This is an ML screening prediction, not biological proof or clinical advice.</p>
+  `;
+}
+
+function storyLabelForPrediction(label, score) {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("synerg")) {
+    return "synergistic";
   }
-  if (data.explanation) {
-    parts.push(data.explanation);
-  } else {
-    parts.push("Negative ComboScore values indicate stronger synergy; positive values indicate antagonism.");
+  if (normalized.includes("antag")) {
+    return "antagonistic";
   }
-  if (data.suggestion) {
-    parts.push(data.suggestion);
+  if (normalized.includes("neutral") || normalized.includes("weak")) {
+    return "neutral";
   }
-  return parts.join(" ");
+  return semanticLabelForScore(score);
+}
+
+function semanticLabelForScore(score) {
+  const value = Number(score);
+  if (value >= NEUTRAL_THRESHOLD) {
+    return "synergistic";
+  }
+  if (value <= -NEUTRAL_THRESHOLD) {
+    return "antagonistic";
+  }
+  return "neutral";
+}
+
+function scoreMeaningForScore(score) {
+  const value = Number(score);
+  if (value >= NEUTRAL_THRESHOLD) {
+    return "the model predicts a positive ComboScore, which means the drug pair may perform better together than expected in this cell line. This suggests a synergistic interaction.";
+  }
+  if (value > -NEUTRAL_THRESHOLD) {
+    return "the predicted ComboScore is close to zero, which means the drug pair behaves roughly as expected from the individual drugs. This suggests neutral or additive behavior.";
+  }
+  return "the model predicts a negative ComboScore, which means the drug pair may perform worse together than expected in this cell line. This suggests antagonism.";
 }
 
 function setGauge(score, color, min, max) {
@@ -667,8 +1123,8 @@ function setGauge(score, color, min, max) {
     return;
   }
 
-  const safeMin = Number.isFinite(min) ? min : -1200;
-  const safeMax = Number.isFinite(max) && max > safeMin ? max : 700;
+  const safeMin = Number.isFinite(min) ? min : SCORE_DISPLAY_MIN;
+  const safeMax = Number.isFinite(max) && max > safeMin ? max : SCORE_DISPLAY_MAX;
   const clamped = Math.max(safeMin, Math.min(safeMax, Number(score)));
   const ratio = ((clamped - safeMin) / (safeMax - safeMin)) * 100;
   arc.style.strokeDashoffset = String(100 - ratio);
@@ -698,13 +1154,20 @@ function copyField(sourceId, targetId) {
 async function runExplain() {
   clearAlert("explain-alert");
 
+  const validation = refreshAllValidation();
+  if (!validation.explain) {
+    showAlert("explain-alert", "Select valid drugs and a valid cell line before requesting the SHAP explanation.");
+    return;
+  }
+
   const payload = buildModelPayload("edrug1-id", "edrug1-input", "edrug2-id", "edrug2-input", "ecell-line");
   if (!payload) {
-    showAlert("explain-alert", "Select both NSC drugs and a cell line before requesting the SHAP explanation.");
+    showAlert("explain-alert", getPredictionInputError("edrug1-input", "edrug2-input", "ecell-line"));
     return;
   }
 
   setButtonLoading("explain-btn", "explain-btn-text", true, "Generate Explanation", "Computing SHAP");
+  startExplainLoader();
 
   try {
     const data = await apiJson(API.explain, {
@@ -712,21 +1175,53 @@ async function runExplain() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    renderExplanation(normalizeExplanationResponse(data));
+    const explanation = normalizeExplanationResponse(data);
+    state.lastExplanation = explanation;
+    stopExplainLoader();
+    renderExplanation(explanation);
   } catch (error) {
+    stopExplainLoader({ restorePanel: true });
     showAlert("explain-alert", error.message);
   } finally {
     setButtonLoading("explain-btn", "explain-btn-text", false, "Generate Explanation", "Computing SHAP");
+    refreshAllValidation();
   }
+}
+
+function startExplainLoader() {
+  document.getElementById("shap-empty").hidden = true;
+  document.getElementById("shap-content").hidden = true;
+  startInlineLoader("explain", EXPLAIN_FLOW_MESSAGES);
+}
+
+function stopExplainLoader(options = {}) {
+  stopInlineLoader("explain");
+  if (options.restorePanel) {
+    restoreExplainPanel();
+  }
+}
+
+function restoreExplainPanel() {
+  const empty = document.getElementById("shap-empty");
+  const content = document.getElementById("shap-content");
+
+  if (state.lastExplanation) {
+    empty.hidden = true;
+    content.hidden = false;
+    return;
+  }
+
+  empty.hidden = false;
+  content.hidden = true;
 }
 
 function normalizeExplanationResponse(data) {
   const positive = normalizeShapRecords(
-    data.top_antagonism_drivers || data.top_positive_contributors || [],
+    data.top_positive_contributors || data.top_synergy_drivers || [],
     1
   );
   const negative = normalizeShapRecords(
-    data.top_synergy_drivers || data.top_negative_contributors || [],
+    data.top_negative_contributors || data.top_antagonism_drivers || [],
     -1
   );
   const features = negative.concat(positive)
@@ -764,16 +1259,38 @@ function renderExplanation(data) {
   document.getElementById("shap-empty").hidden = true;
   document.getElementById("shap-content").hidden = false;
 
-  if (!window.Chart) {
-    showAlert("explain-alert", "Chart.js did not load, so the SHAP chart cannot render.");
-    return;
-  }
-
   const themeColors = getThemeChartColors();
   const labels = data.features.map((feature) => feature.feature);
   const values = data.features.map((feature) => Number(feature.shap));
-  const colors = values.map((value) => value >= 0 ? "rgba(199, 71, 71, 0.82)" : "rgba(15, 118, 110, 0.82)");
-  const borders = values.map((value) => value >= 0 ? "rgba(199, 71, 71, 1)" : "rgba(15, 118, 110, 1)");
+  const colors = values.map((value) => value >= 0 ? "rgba(15, 118, 110, 0.82)" : "rgba(199, 71, 71, 0.82)");
+  const borders = values.map((value) => value >= 0 ? "rgba(15, 118, 110, 1)" : "rgba(199, 71, 71, 1)");
+  const prediction = Number(data.prediction).toFixed(3);
+  const baseValue = data.baseValue === null || data.baseValue === undefined
+    ? "n/a"
+    : Number(data.baseValue).toFixed(3);
+
+  setText("shap-prediction", prediction);
+  setText("shap-base", baseValue);
+  setText("shap-base-info", data.summary || (
+    data.baseValue === null || data.baseValue === undefined
+      ? `Final prediction: ${prediction}. Base value was not returned by the explainer.`
+      : `Base value: ${baseValue}. Final prediction: ${prediction}.`
+  ));
+
+  const chartShell = document.querySelector(".chart-shell");
+  if (!window.Chart) {
+    if (state.shapChart) {
+      state.shapChart.destroy();
+      state.shapChart = null;
+    }
+    renderShapFallback(chartShell, data.features);
+    showAlert("explain-alert", "Chart.js did not load, so a lightweight SHAP list is shown instead.");
+    return;
+  }
+
+  if (chartShell && !document.getElementById("shap-chart")) {
+    chartShell.innerHTML = `<canvas id="shap-chart"></canvas>`;
+  }
 
   if (state.shapChart) {
     state.shapChart.destroy();
@@ -823,35 +1340,55 @@ function renderExplanation(data) {
     }
   });
 
-  const prediction = Number(data.prediction).toFixed(3);
-  const baseValue = data.baseValue === null || data.baseValue === undefined
-    ? "n/a"
-    : Number(data.baseValue).toFixed(3);
+}
 
-  setText("shap-prediction", prediction);
-  setText("shap-base", baseValue);
-  setText("shap-base-info", data.summary || (
-    data.baseValue === null || data.baseValue === undefined
-      ? `Final prediction: ${prediction}. Base value was not returned by the explainer.`
-      : `Base value: ${baseValue}. Final prediction: ${prediction}.`
-  ));
+function renderShapFallback(container, features) {
+  if (!container) {
+    return;
+  }
+
+  const rows = features.slice(0, 12).map((feature) => {
+    const value = Number(feature.shap);
+    const safeValue = Number.isFinite(value) ? value : 0;
+    const magnitude = Math.min(100, Math.abs(safeValue) * 100);
+    const direction = safeValue >= 0 ? "synergy" : "antagonism";
+    const directionText = safeValue >= 0 ? "toward synergy" : "toward antagonism";
+    return `
+      <div class="shap-fallback-row">
+        <div>
+          <strong>${escapeHtml(feature.feature)}</strong>
+          <span>${escapeHtml(directionText)}</span>
+        </div>
+        <div class="shap-fallback-bar" data-direction="${direction}">
+          <i style="width: ${magnitude}%"></i>
+        </div>
+        <code>${escapeHtml(formatScore(value, 4))}</code>
+      </div>
+    `;
+  }).join("");
+
+  container.innerHTML = `<div class="shap-fallback-list">${rows || "<p>No SHAP contributors returned.</p>"}</div>`;
 }
 
 async function loadDrugInfo() {
   clearAlert("drug-alert");
 
+  const validation = refreshAllValidation();
+  if (!validation.drugs) {
+    showAlert("drug-alert", "Select two valid NSC drugs before loading compound details.");
+    return;
+  }
+
   const drug1 = resolveDrugId("ddrug1-id", "ddrug1-input");
   const drug2 = resolveDrugId("ddrug2-id", "ddrug2-input");
 
   if (!drug1 || !drug2) {
-    showAlert("drug-alert", "Select two NSC drugs before loading compound details.");
+    showAlert("drug-alert", getDrugInfoInputError("ddrug1-input", "ddrug2-input"));
     return;
   }
 
   setButtonLoading("drug-info-btn", "dinfo-btn-text", true, "Load Drug Details", "Loading compounds");
-
-  const area = document.getElementById("drug-cards-area");
-  area.innerHTML = `<div class="empty-state empty-state--compact"><h3>Fetching compound data</h3><p>Loading molecular structures and metadata now.</p></div>`;
+  startDrugInfoLoader();
 
   try {
     const response = await fetch(API.moleculePair, {
@@ -863,14 +1400,33 @@ async function loadDrugInfo() {
     if (!response.ok && !data.NSC1 && !data.NSC2) {
       throw new Error(cleanError(data.error || "Molecule lookup failed."));
     }
+    stopDrugInfoLoader();
     renderMoleculeCards(data);
     if (data.status === "error") {
       showAlert("drug-alert", "One or more molecules could not be rendered. See the cards for details.");
     }
   } catch (error) {
+    stopDrugInfoLoader({ restorePanel: true });
     showAlert("drug-alert", error.message);
   } finally {
     setButtonLoading("drug-info-btn", "dinfo-btn-text", false, "Load Drug Details", "Loading compounds");
+    refreshAllValidation();
+  }
+}
+
+function startDrugInfoLoader() {
+  const area = document.getElementById("drug-cards-area");
+  if (area) {
+    area.hidden = true;
+  }
+  startInlineLoader("drug", DRUG_INFO_FLOW_MESSAGES);
+}
+
+function stopDrugInfoLoader(options = {}) {
+  stopInlineLoader("drug");
+  const area = document.getElementById("drug-cards-area");
+  if (area) {
+    area.hidden = false;
   }
 }
 
@@ -956,6 +1512,34 @@ function insertSanitizedSvg(container, svgText) {
   container.replaceChildren(document.importNode(svg, true));
 }
 
+function stageBatchFile(file) {
+  clearAlert("batch-alert");
+
+  if (file.size > 10 * 1024 * 1024) {
+    state.selectedBatchFile = null;
+    showAlert("batch-alert", "Maximum upload size is 10 MB.");
+    setText("drop-zone-title", "Drop your file here");
+    const runButton = document.getElementById("batch-run-btn");
+    if (runButton) {
+      runButton.disabled = true;
+    }
+    return;
+  }
+
+  state.selectedBatchFile = file;
+  setText("drop-zone-title", `Selected ${file.name}`);
+  setButtonLoading("batch-run-btn", "batch-run-btn-text", false, "Run Batch Prediction", "Running Batch");
+}
+
+function runSelectedBatchFile() {
+  if (!state.selectedBatchFile) {
+    showAlert("batch-alert", "Select a CSV file before running batch prediction.");
+    return;
+  }
+
+  processBatchFile(state.selectedBatchFile);
+}
+
 async function processBatchFile(file) {
   clearAlert("batch-alert");
 
@@ -965,6 +1549,8 @@ async function processBatchFile(file) {
   }
 
   document.getElementById("drop-zone-title").textContent = `Processing ${file.name}`;
+  setButtonLoading("batch-run-btn", "batch-run-btn-text", true, "Run Batch Prediction", "Running Batch");
+  startBatchLoader();
 
   try {
     const uploadFile = await normalizeBatchFile(file);
@@ -981,6 +1567,7 @@ async function processBatchFile(file) {
       }
       state.batchBlob = null;
       state.batchDownloadUrl = makeDownloadUrl(data.output_file);
+      stopBatchLoader();
       renderBatchJson(data);
     } else {
       if (!response.ok) {
@@ -989,16 +1576,75 @@ async function processBatchFile(file) {
       state.batchBlob = await response.blob();
       state.batchDownloadUrl = "";
       const csvText = await state.batchBlob.text();
+      stopBatchLoader();
       renderBatchCsv(csvText);
     }
 
     document.getElementById("batch-empty").hidden = true;
     document.getElementById("batch-result").classList.add("is-visible");
+    state.lastBatchRendered = true;
     document.getElementById("download-btn").disabled = false;
     document.getElementById("drop-zone-title").textContent = `Processed ${file.name}`;
+    setButtonLoading("batch-run-btn", "batch-run-btn-text", false, "Run Again", "Running Batch");
   } catch (error) {
+    stopBatchLoader({ restorePanel: true });
     showAlert("batch-alert", error.message);
-    document.getElementById("drop-zone-title").textContent = "Drop your file here";
+    document.getElementById("drop-zone-title").textContent = `Selected ${file.name}`;
+    setButtonLoading("batch-run-btn", "batch-run-btn-text", false, "Run Batch Prediction", "Running Batch");
+  }
+}
+
+function startBatchLoader() {
+  const empty = document.getElementById("batch-empty");
+  const result = document.getElementById("batch-result");
+  const download = document.getElementById("download-btn");
+
+  if (empty) {
+    empty.hidden = true;
+  }
+  if (result) {
+    result.classList.remove("is-visible");
+  }
+  if (download) {
+    download.disabled = true;
+  }
+
+  startInlineLoader("batch", BATCH_FLOW_MESSAGES);
+}
+
+function stopBatchLoader(options = {}) {
+  stopInlineLoader("batch");
+  if (options.restorePanel) {
+    restoreBatchPanel();
+  }
+}
+
+function restoreBatchPanel() {
+  const empty = document.getElementById("batch-empty");
+  const result = document.getElementById("batch-result");
+  const download = document.getElementById("download-btn");
+
+  if (state.lastBatchRendered) {
+    if (empty) {
+      empty.hidden = true;
+    }
+    if (result) {
+      result.classList.add("is-visible");
+    }
+    if (download) {
+      download.disabled = !state.batchBlob && !state.batchDownloadUrl;
+    }
+    return;
+  }
+
+  if (empty) {
+    empty.hidden = false;
+  }
+  if (result) {
+    result.classList.remove("is-visible");
+  }
+  if (download) {
+    download.disabled = true;
   }
 }
 
@@ -1088,7 +1734,10 @@ function renderBatchTable(rows) {
     <tr>
       ${headers.map((header) => {
         const value = row[header] ?? "";
-        if (header === "prediction_label" || header === "label" || header === "status") {
+        if (header === "prediction_label" || header === "label") {
+          return `<td>${renderBadge(batchLabelForRow(row, value))}</td>`;
+        }
+        if (header === "status") {
           return `<td>${renderBadge(value)}</td>`;
         }
         if (header === "final_predicted_COMBOSCORE") {
@@ -1098,6 +1747,11 @@ function renderBatchTable(rows) {
       }).join("")}
     </tr>
   `).join("");
+}
+
+function batchLabelForRow(row, fallbackLabel) {
+  const score = Number(row.final_predicted_COMBOSCORE);
+  return Number.isFinite(score) ? semanticLabelForScore(score) : fallbackLabel;
 }
 
 function downloadBatchResults() {
@@ -1128,7 +1782,7 @@ function renderBadge(label) {
   const normalized = String(label || "").toLowerCase();
   let className = "badge badge-neutral";
 
-  if (normalized.includes("synergy") || normalized === "success") {
+  if (normalized.includes("synergy") || normalized.includes("synerg") || normalized === "success") {
     className = "badge badge-synergy";
   } else if (normalized.includes("weak") || normalized.includes("neutral")) {
     className = "badge badge-mild";
@@ -1210,18 +1864,18 @@ function categoryForLabel(label, score) {
   if (normalized.includes("moderate") && normalized.includes("antag")) return "moderate_antagonism";
   if (normalized.includes("synerg")) return "moderate_synergy";
   if (normalized.includes("antag")) return "moderate_antagonism";
-  if (Number(score) <= -80) return "strong_synergy";
-  if (Number(score) <= -30) return "moderate_synergy";
-  if (Number(score) >= 80) return "strong_antagonism";
-  if (Number(score) >= 30) return "moderate_antagonism";
+  if (Number(score) >= 80) return "strong_synergy";
+  if (Number(score) >= NEUTRAL_THRESHOLD) return "moderate_synergy";
+  if (Number(score) <= -80) return "strong_antagonism";
+  if (Number(score) <= -NEUTRAL_THRESHOLD) return "moderate_antagonism";
   return "neutral";
 }
 
 function labelForScore(score) {
-  if (score <= -80) return "Strong Synergy";
-  if (score <= -30) return "Moderate Synergy";
-  if (score < 30) return "Neutral / Weak effect";
-  if (score < 80) return "Moderate Antagonism";
+  if (score >= 80) return "Strong Synergy";
+  if (score >= NEUTRAL_THRESHOLD) return "Moderate Synergy";
+  if (score > -NEUTRAL_THRESHOLD) return "Neutral / Weak effect";
+  if (score > -80) return "Moderate Antagonism";
   return "Strong Antagonism";
 }
 

@@ -444,7 +444,7 @@ Repair requirement:
 - Update `renderPrediction()` to use the real shape or create a small `normalizePredictionResponse(data)` function.
 - Do not break the backend if backend is already correct.
 
-### 4. Score interpretation may be scientifically wrong if hard-coded only in frontend
+### 4. Score interpretation must follow ComboScore direction
 
 Current JS uses frontend thresholds in `buildInterpretationSummary()`:
 
@@ -456,13 +456,12 @@ score > -5  => close to additive
 else        => antagonistic
 ```
 
-But the verified demo case has `actual_comboscore = -727.0...`. That means score ranges can be much wider than `-20 to +20`, and the sign/meaning must be confirmed from the trained backend and project convention.
+ComboScore is `Expected growth - Observed percent growth`. Positive ComboScore suggests synergy, negative ComboScore suggests antagonism, and values near zero suggest neutral or additive behavior. Score ranges can be much wider than `-20 to +20`, so the UI should show the raw score and use a clear neutral band.
 
 Repair requirement:
 
 - Prefer backend-provided `label`, `interpretation`, `level`, and `color` if available.
-- If the backend does not provide them, inspect the model training/evaluation code and project documentation before defining thresholds.
-- Do not assume positive score automatically means synergy.
+- If the backend does not provide them, use the project ComboScore rule: positive means synergy, negative means antagonism, near zero means neutral.
 - Make the frontend display the model score and backend label faithfully.
 
 ### 5. Gauge scale is probably too narrow
@@ -601,7 +600,7 @@ Goals:
 4. Make Explain work and render the SHAP chart using the actual /api/explain response shape.
 5. Make Drug Info work against the actual backend compound/molecule metadata route. If the route name differs from app.js, fix the frontend or add a compatibility route.
 6. Make Batch upload work against the actual backend batch endpoint. Ensure the expected CSV headers in the UI match what backend accepts.
-7. Do not assume positive score means synergy. Use backend-provided label/interpretation where possible. If thresholds are necessary, inspect backend/project conventions first.
+7. Use the corrected ComboScore sign convention: positive means synergy, negative means antagonism, near zero means neutral. Use backend-provided label/interpretation where possible.
 8. Keep the current visual design in app.css.
 
 After implementing, cross-verify your own work:

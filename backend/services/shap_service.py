@@ -109,9 +109,9 @@ def _counterpart_feature(feature_name):
 def _feature_record(feature_name, feature_value, shap_value):
     metadata = _feature_metadata(feature_name)
     effect = (
-        "pushes prediction upward / more antagonistic"
+        "pushes prediction upward / more synergistic"
         if shap_value > 0
-        else "pushes prediction downward / more synergistic"
+        else "pushes prediction downward / more antagonistic"
     )
     return {
         "feature": feature_name,
@@ -167,8 +167,8 @@ def _summary(label, final_prediction):
 
     return (
         f"The final predicted ComboScore is {final_prediction:.3f}, so {interpretation}. "
-        "Positive SHAP values pushed the prediction upward toward antagonism. "
-        "Negative SHAP values pushed the prediction downward toward synergy. "
+        "Positive SHAP values pushed the ComboScore upward toward synergy. "
+        "Negative SHAP values pulled the ComboScore downward toward antagonism. "
         "The listed contributors average the forward and reverse drug-order explanations."
     )
 

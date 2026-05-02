@@ -64,14 +64,14 @@ def _make_demo_record(case_type, description, row):
 def get_demo_cases():
     predictions = _load_demo_predictions()
 
-    strong_synergy_row = predictions.loc[predictions["predicted_comboscore"].idxmin()]
+    strong_synergy_row = predictions.loc[predictions["predicted_comboscore"].idxmax()]
     neutral_row = predictions.loc[predictions["predicted_comboscore"].abs().idxmin()]
-    antagonism_row = predictions.loc[predictions["predicted_comboscore"].idxmax()]
+    antagonism_row = predictions.loc[predictions["predicted_comboscore"].idxmin()]
 
     demo_cases = [
         _make_demo_record(
             "strong_synergy",
-            "Most negative predicted ComboScore in the saved Step 5 test predictions.",
+            "Most positive predicted ComboScore in the saved Step 5 test predictions.",
             strong_synergy_row,
         ),
         _make_demo_record(
@@ -81,7 +81,7 @@ def get_demo_cases():
         ),
         _make_demo_record(
             "antagonism",
-            "Most positive predicted ComboScore in the saved Step 5 test predictions.",
+            "Most negative predicted ComboScore in the saved Step 5 test predictions.",
             antagonism_row,
         ),
     ]

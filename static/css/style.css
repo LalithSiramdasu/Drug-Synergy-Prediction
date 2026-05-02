@@ -703,7 +703,7 @@ code {
 .gauge-fill.left {
   left: 0;
   width: 50%;
-  background: linear-gradient(90deg, var(--teal), rgba(22,183,176,0.16));
+  background: linear-gradient(90deg, var(--magenta), rgba(230,90,167,0.16));
 }
 
 .gauge-fill.mid {
@@ -715,7 +715,7 @@ code {
 .gauge-fill.right {
   right: 0;
   width: 50%;
-  background: linear-gradient(90deg, rgba(230,90,167,0.16), var(--magenta));
+  background: linear-gradient(90deg, rgba(22,183,176,0.16), var(--teal));
 }
 
 .needle {

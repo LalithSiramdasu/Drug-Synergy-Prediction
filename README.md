@@ -314,25 +314,26 @@ data/step6_final_model_feature_columns.json
 
 ComboScore meaning:
 
-- More negative means stronger predicted synergy.
-- Near zero means neutral or weak effect.
-- More positive means antagonism.
+- `ComboScore = Expected growth - Observed percent growth`.
+- Positive ComboScore indicates stronger-than-expected inhibition and suggests synergy.
+- Negative ComboScore indicates weaker-than-expected inhibition and suggests antagonism.
+- Scores near zero suggest additive or neutral behavior.
 
 Project-level five-band interpretation:
 
 | Score range | Label | Category |
 | --- | --- | --- |
-| `score <= -80` | Strong Synergy | `strong_synergy` |
-| `-80 < score <= -30` | Moderate Synergy | `moderate_synergy` |
-| `-30 < score < 30` | Neutral / Weak effect | `neutral` |
-| `30 <= score < 80` | Moderate Antagonism | `moderate_antagonism` |
-| `score >= 80` | Strong Antagonism | `strong_antagonism` |
+| `score >= 80` | Strong Synergy | `strong_synergy` |
+| `20 <= score < 80` | Moderate Synergy | `moderate_synergy` |
+| `-20 < score < 20` | Neutral / Weak effect | `neutral` |
+| `-80 < score <= -20` | Moderate Antagonism | `moderate_antagonism` |
+| `score <= -80` | Strong Antagonism | `strong_antagonism` |
 
 Current backend implementation note:
 
 - `backend/services/prediction_service.py` currently returns a broad `label`
   field with values such as `synergistic`, `neutral`, and `antagonistic`.
-- The current broad thresholds are `<= -20`, `>= 20`, and near-zero otherwise.
+- The current broad thresholds are `>= 20`, `<= -20`, and near-zero otherwise.
 - The frontend has normalization helpers for the five-band labels when those
   fields are present.
 
@@ -807,9 +808,9 @@ The SHAP service:
 6. Averages feature effects across both orders.
 7. Returns top positive and negative contributors.
 
-Positive SHAP values push the prediction upward, toward antagonism.
+Positive SHAP values push the ComboScore upward, toward synergy.
 
-Negative SHAP values push the prediction downward, toward synergy.
+Negative SHAP values pull the ComboScore downward, toward antagonism.
 
 Verified SHAP response summary for `740 + 750 / 786-0`:
 
@@ -847,17 +848,17 @@ Selection logic:
 
 | Demo | Selection |
 | --- | --- |
-| Strong synergy | Most negative `predicted_comboscore` |
+| Strong synergy | Most positive `predicted_comboscore` |
 | Neutral | `predicted_comboscore` closest to zero |
-| Antagonism | Most positive `predicted_comboscore` |
+| Antagonism | Most negative `predicted_comboscore` |
 
 Verified demo extremes:
 
 | Demo | NSC1 | NSC2 | CELLNAME | Predicted ComboScore | Model |
 | --- | ---: | ---: | --- | ---: | --- |
-| Strong synergy | 92859 | 141540 | HL-60(TB) | -315.0966491087212 | LightGBM |
+| Strong synergy | 761431 | 761432 | SK-MEL-5 | 230.61074799671496 | LightGBM |
 | Neutral | 66847 | 749226 | SNB-19 | 0.0 | RandomForest |
-| Antagonism | 761431 | 761432 | SK-MEL-5 | 230.61074799671496 | LightGBM |
+| Antagonism | 92859 | 141540 | HL-60(TB) | -315.0966491087212 | LightGBM |
 
 ---
 

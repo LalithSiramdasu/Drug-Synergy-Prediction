@@ -14,6 +14,7 @@ FIELD_ALIASES = {
     "NSC2": ("NSC2", "drug2_id", "Drug2", "drug2", "nsc2"),
     "CELLNAME": ("CELLNAME", "cell_line", "cellLine", "cell", "cellname"),
 }
+NEUTRAL_THRESHOLD = 20
 
 
 def _require_field(payload, field_name):
@@ -77,15 +78,15 @@ def _predict_one(model, feature_frame):
 
 
 def _label_prediction(score):
-    if score <= -20:
+    if score >= NEUTRAL_THRESHOLD:
         return (
             "synergistic",
-            "The predicted ComboScore is negative, which suggests synergy for this drug pair and cell line.",
+            "The predicted ComboScore is positive, which suggests synergy for this drug pair and cell line.",
         )
-    if score >= 20:
+    if score <= -NEUTRAL_THRESHOLD:
         return (
             "antagonistic",
-            "The predicted ComboScore is positive, which suggests antagonism for this drug pair and cell line.",
+            "The predicted ComboScore is negative, which suggests antagonism for this drug pair and cell line.",
         )
     return (
         "neutral",

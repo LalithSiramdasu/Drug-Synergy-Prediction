@@ -461,37 +461,39 @@ The model predicts COMBOSCORE.
 
 Interpretation:
 
-Negative ComboScore:
+ComboScore = Expected growth - Observed percent growth.
 
-Synergy
+Positive ComboScore:
+
+Synergy, because observed inhibition is stronger than expected.
 
 Near zero ComboScore:
 
 Neutral or weak effect
 
-Positive ComboScore:
+Negative ComboScore:
 
-Antagonism
+Antagonism, because observed inhibition is weaker than expected.
 
 Use these thresholds:
 
-score <= -80:
+score >= 80:
 
 Strong Synergy
 
--80 < score <= -30:
+20 <= score < 80:
 
 Moderate Synergy
 
--30 < score < 30:
+-20 < score < 20:
 
 Neutral / Weak effect
 
-30 <= score < 80:
+-80 < score <= -20:
 
 Moderate Antagonism
 
-score >= 80:
+score <= -80:
 
 Strong Antagonism
 
@@ -505,7 +507,7 @@ Gauge meaning:
 
 Left side:
 
-Strong Synergy
+Strong Antagonism
 
 Middle:
 
@@ -513,7 +515,7 @@ Neutral
 
 Right side:
 
-Strong Antagonism
+Strong Synergy
 
 Gauge value:
 
@@ -554,17 +556,17 @@ Each prediction should return:
 
 Example explanation logic:
 
-If score is strongly negative:
+If score is strongly positive:
 
-The model predicts strong synergy, meaning this drug pair may work better together for this cell line.
+The model predicts strong synergy, meaning this drug pair may inhibit more strongly than expected for this cell line.
 
 If score is near zero:
 
 The model predicts a neutral or weak interaction.
 
-If score is strongly positive:
+If score is strongly negative:
 
-The model predicts antagonism, meaning the drug pair may interfere with each other.
+The model predicts antagonism, meaning the drug pair may inhibit less strongly than expected for this cell line.
 
 ---
 
@@ -655,7 +657,7 @@ Selection logic:
 
 Strong synergy:
 
-row with most negative predicted ComboScore
+row with most positive predicted ComboScore
 
 Neutral:
 
@@ -663,7 +665,7 @@ row with predicted ComboScore closest to zero
 
 Antagonism:
 
-row with most positive predicted ComboScore
+row with most negative predicted ComboScore
 
 Each demo case should return:
 
@@ -722,8 +724,8 @@ POST /api/explain
 
 SHAP should explain:
 
-- which features pushed prediction toward synergy
-- which features pushed prediction toward antagonism
+- which features pushed prediction upward toward synergy
+- which features pulled prediction downward toward antagonism
 - simple English explanation
 - prediction-based suggestion
 

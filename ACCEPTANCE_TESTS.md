@@ -353,14 +353,19 @@ Use this input:
 }
 ```
 
+ComboScore = Expected growth - Observed percent growth. Positive ComboScore indicates
+stronger-than-expected inhibition and suggests synergy. Negative ComboScore indicates
+weaker-than-expected inhibition and suggests antagonism. Scores near zero suggest
+additive or neutral behavior.
+
 The returned prediction label must follow these thresholds:
 
 ```text
-score <= -80       -> Strong Synergy
--80 to -30         -> Moderate Synergy
--30 to +30         -> Neutral / Weak effect
-+30 to +80         -> Moderate Antagonism
-score >= +80       -> Strong Antagonism
+score >= +80       -> Strong Synergy
++20 to +80         -> Moderate Synergy
+-20 to +20         -> Neutral / Weak effect
+-80 to -20         -> Moderate Antagonism
+score <= -80       -> Strong Antagonism
 ```
 
 Pass condition:
@@ -751,6 +756,7 @@ Pass condition:
 
 ```text
 SHAP output uses readable feature names.
+Positive SHAP values push the ComboScore upward toward synergy, and negative SHAP values pull the ComboScore downward toward antagonism.
 ```
 
 Readable examples:
@@ -906,7 +912,7 @@ After prediction, frontend gauge should show:
 Left label:
 
 ```text
-Strong Synergy
+Strong Antagonism
 ```
 
 Middle label:
@@ -918,7 +924,7 @@ Neutral
 Right label:
 
 ```text
-Strong Antagonism
+Strong Synergy
 ```
 
 Gauge value:

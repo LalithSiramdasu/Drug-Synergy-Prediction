@@ -212,6 +212,11 @@ average of forward and reverse
 
 Converts numeric ComboScore into understandable output.
 
+ComboScore = Expected growth - Observed percent growth. Positive ComboScore indicates
+stronger-than-expected inhibition and suggests synergy. Negative ComboScore indicates
+weaker-than-expected inhibition and suggests antagonism. Scores near zero suggest
+additive or neutral behavior.
+
 Responsibilities:
 
 - assign prediction label
@@ -222,31 +227,31 @@ Responsibilities:
 
 Label thresholds:
 
-score <= -80:
+score >= 80:
 
 Strong Synergy
 
--80 < score <= -30:
+20 <= score < 80:
 
 Moderate Synergy
 
--30 < score < 30:
+-20 < score < 20:
 
 Neutral / Weak effect
 
-30 <= score < 80:
+-80 < score <= -20:
 
 Moderate Antagonism
 
-score >= 80:
+score <= -80:
 
 Strong Antagonism
 
 Gauge:
 
-- left = Strong Synergy
+- left = Strong Antagonism
 - middle = Neutral
-- right = Strong Antagonism
+- right = Strong Synergy
 
 Use historical min/max from model_matrix.csv if available.
 
@@ -396,7 +401,7 @@ Selection logic:
 
 Strong synergy:
 
-Most negative predicted ComboScore
+Most positive predicted ComboScore
 
 Neutral:
 
@@ -404,7 +409,7 @@ Predicted ComboScore closest to zero
 
 Antagonism:
 
-Most positive predicted ComboScore
+Most negative predicted ComboScore
 
 ---
 
@@ -610,7 +615,7 @@ The predicted ComboScore is close to zero, so this drug pair is predicted to hav
 
 Suggestion:
 
-This pair is not predicted to show strong synergy. Consider checking stronger negative ComboScore pairs.
+This pair is not predicted to show strong synergy. Consider checking stronger positive ComboScore pairs.
 
 ---
 
@@ -631,13 +636,13 @@ Example response:
       "prediction_label": "Neutral / Weak effect",
       "prediction_category": "neutral",
       "explanation": "The predicted ComboScore is close to zero, so this drug pair is predicted to have weak or neutral interaction for this cell line.",
-      "suggestion": "This pair is not predicted to show strong synergy. Consider checking stronger negative ComboScore pairs.",
+      "suggestion": "This pair is not predicted to show strong synergy. Consider checking stronger positive ComboScore pairs.",
       "gauge_min": -1200,
       "gauge_max": 700,
       "gauge_value": -16.87,
-      "left_label": "Strong Synergy",
+      "left_label": "Strong Antagonism",
       "middle_label": "Neutral",
-      "right_label": "Strong Antagonism"
+      "right_label": "Strong Synergy"
     }
 
 ---
@@ -741,8 +746,8 @@ Flow:
 4. Use same final feature order
 5. Compute SHAP explanation
 6. Convert raw feature names into readable names
-7. Return top features pushing score negative
-8. Return top features pushing score positive
+7. Return top features pushing the ComboScore upward toward synergy
+8. Return top features pulling the ComboScore downward toward antagonism
 9. Return simple explanation
 
 Important:
@@ -761,16 +766,16 @@ Response example:
         {
           "feature": "Drug 1 LogP",
           "value": 2.31,
-          "impact": -5.44,
-          "meaning": "This feature pushed the prediction toward synergy."
+          "impact": 5.44,
+          "meaning": "This feature pushed the ComboScore upward toward synergy."
         }
       ],
       "top_antagonism_drivers": [
         {
           "feature": "Drug 2 Molecular Weight",
           "value": 489.93,
-          "impact": 3.18,
-          "meaning": "This feature pushed the prediction toward antagonism."
+          "impact": -3.18,
+          "meaning": "This feature pulled the ComboScore downward toward antagonism."
         }
       ],
       "plain_english_explanation": "The model prediction was mainly influenced by molecular descriptors and fingerprint patterns from both drugs.",
@@ -793,9 +798,9 @@ Flow:
 
 1. Load prediction file
 2. Identify predicted score column
-3. Pick most negative prediction as strong synergy demo
+3. Pick most positive prediction as strong synergy demo
 4. Pick prediction closest to zero as neutral demo
-5. Pick most positive prediction as antagonism demo
+5. Pick most negative prediction as antagonism demo
 6. Return three demo records
 
 Response example:
@@ -807,7 +812,7 @@ Response example:
           "NSC1": 123,
           "NSC2": 456,
           "CELLNAME": "A498",
-          "predicted_score": -210.5,
+          "predicted_score": 210.5,
           "label": "Strong Synergy"
         },
         "neutral": {
@@ -821,7 +826,7 @@ Response example:
           "NSC1": 111,
           "NSC2": 222,
           "CELLNAME": "MCF7",
-          "predicted_score": 150.8,
+          "predicted_score": -150.8,
           "label": "Strong Antagonism"
         }
       }

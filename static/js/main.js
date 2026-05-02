@@ -22,7 +22,8 @@ const DEMO_TITLES = {
   antagonism: "Antagonism"
 };
 const GAUGE_MIN = -500;
-const GAUGE_MAX = 250;
+const GAUGE_MAX = 500;
+const NEUTRAL_THRESHOLD = 20;
 
 const state = {
   drugs: new Set(),
@@ -396,9 +397,9 @@ function renderPrediction(prediction) {
     factTile("Input", `${input.NSC1} + ${input.NSC2} / ${input.CELLNAME}`)
   ].join("");
 
-  const directionText = score < -20
+  const directionText = score > NEUTRAL_THRESHOLD
     ? "the result suggests synergistic behavior."
-    : score > 20
+    : score < -NEUTRAL_THRESHOLD
       ? "the result suggests antagonistic behavior."
       : "the result suggests neutral or mostly additive behavior.";
 
@@ -406,7 +407,7 @@ function renderPrediction(prediction) {
     `For cell line ${input.CELLNAME}, the backend selected ${prediction.model_used} because it is the final best model for this cell line. ` +
     `It predicted Drug 1 to Drug 2 as ${formatScore(prediction.prediction_NSC1_to_NSC2)} and Drug 2 to Drug 1 as ` +
     `${formatScore(prediction.prediction_NSC2_to_NSC1)}, then averaged both values to produce final ComboScore ` +
-    `${formatScore(score)}. Because the score is ${score < -20 ? "negative" : score > 20 ? "positive" : "near zero"}, ${directionText} ` +
+    `${formatScore(score)}. Because the score is ${score < -NEUTRAL_THRESHOLD ? "negative" : score > NEUTRAL_THRESHOLD ? "positive" : "near zero"}, ${directionText} ` +
     `${prediction.explanation || ""}`;
 }
 
@@ -579,11 +580,11 @@ function renderExplanation(data) {
     </div>
     <div class="contributor-grid">
       <section>
-        <h3>Pushes upward / more antagonistic</h3>
+        <h3>Pushes upward / more synergistic</h3>
         <div class="contributor-column">${renderContributors(data.top_positive_contributors || [])}</div>
       </section>
       <section>
-        <h3>Pushes downward / more synergistic</h3>
+        <h3>Pushes downward / more antagonistic</h3>
         <div class="contributor-column">${renderContributors(data.top_negative_contributors || [])}</div>
       </section>
     </div>
@@ -717,7 +718,7 @@ function saveRecentPrediction(prediction) {
     NSC2: input.NSC2,
     CELLNAME: input.CELLNAME,
     score: prediction.final_predicted_COMBOSCORE,
-    label: prediction.label,
+    label: labelForScore(prediction.final_predicted_COMBOSCORE),
     model: prediction.model_used
   };
 
@@ -744,13 +745,16 @@ function renderRecentPredictions() {
     return;
   }
 
-  els.recentPredictions.innerHTML = history.map((item, index) => `
-    <button class="recent-item" type="button" data-index="${index}">
-      <strong>${escapeHtml(item.NSC1)} + ${escapeHtml(item.NSC2)}</strong>
-      <span>${escapeHtml(item.CELLNAME)} | ${escapeHtml(item.model)}</span>
-      <span>${formatScore(item.score)} | ${escapeHtml(item.label)}</span>
-    </button>
-  `).join("");
+  els.recentPredictions.innerHTML = history.map((item, index) => {
+    const label = labelForScore(item.score);
+    return `
+      <button class="recent-item" type="button" data-index="${index}">
+        <strong>${escapeHtml(item.NSC1)} + ${escapeHtml(item.NSC2)}</strong>
+        <span>${escapeHtml(item.CELLNAME)} | ${escapeHtml(item.model)}</span>
+        <span>${formatScore(item.score)} | ${escapeHtml(label)}</span>
+      </button>
+    `;
+  }).join("");
 
   els.recentPredictions.querySelectorAll("[data-index]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -784,6 +788,13 @@ function formatScore(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value ?? "");
   return number.toFixed(3);
+}
+
+function labelForScore(score) {
+  const value = Number(score);
+  if (value >= NEUTRAL_THRESHOLD) return "synergistic";
+  if (value <= -NEUTRAL_THRESHOLD) return "antagonistic";
+  return "neutral";
 }
 
 function escapeHtml(value) {

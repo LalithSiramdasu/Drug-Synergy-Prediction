@@ -257,17 +257,18 @@ The model predicts COMBOSCORE.
 
 Interpretation:
 
-- More negative score means stronger synergy.
+- ComboScore = Expected growth - Observed percent growth.
+- Positive ComboScore means stronger-than-expected inhibition and suggests synergy.
 - Near zero means neutral or weak effect.
-- More positive score means antagonism.
+- Negative ComboScore means weaker-than-expected inhibition and suggests antagonism.
 
 Use these labels:
 
-- score <= -80: Strong Synergy
-- -80 < score <= -30: Moderate Synergy
-- -30 < score < 30: Neutral / Weak effect
-- 30 <= score < 80: Moderate Antagonism
-- score >= 80: Strong Antagonism
+- score >= 80: Strong Synergy
+- 20 <= score < 80: Moderate Synergy
+- -20 < score < 20: Neutral / Weak effect
+- -80 < score <= -20: Moderate Antagonism
+- score <= -80: Strong Antagonism
 
 Also return a simple category:
 
@@ -300,9 +301,9 @@ POST /api/predict should return a JSON response similar to this:
 "gauge_min": -1200,
 "gauge_max": 700,
 "gauge_value": -16.87,
-"left_label": "Strong Synergy",
+"left_label": "Strong Antagonism",
 "middle_label": "Neutral",
-"right_label": "Strong Antagonism"
+"right_label": "Strong Synergy"
 }
 
 The numeric values can differ depending on the model output.
@@ -421,8 +422,8 @@ For fingerprint features:
 
 The SHAP response should explain:
 
-- which features pushed the score toward synergy
-- which features pushed the score toward antagonism
+- which features pushed the score upward toward synergy
+- which features pulled the score downward toward antagonism
 - simple explanation of why this prediction may have happened
 - suggestion based on prediction label
 
@@ -442,9 +443,9 @@ predictions/step5_best_model_test_predictions.csv
 
 Selection logic:
 
-- Strong synergy demo = most negative predicted ComboScore
+- Strong synergy demo = most positive predicted ComboScore
 - Neutral demo = predicted ComboScore closest to zero
-- Antagonism demo = most positive predicted ComboScore
+- Antagonism demo = most negative predicted ComboScore
 
 Demo response should include:
 
