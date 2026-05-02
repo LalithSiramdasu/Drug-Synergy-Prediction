@@ -1291,6 +1291,8 @@ input::placeholder {
 .results-stack {
   display: grid;
   gap: 20px;
+  align-content: start;
+  grid-template-rows: max-content minmax(0, 1fr);
 }
 
 .status-pill,
