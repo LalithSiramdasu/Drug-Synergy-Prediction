@@ -24,6 +24,7 @@ const state = {
   demos: [],
   lastPrediction: null,
   lastExplanation: null,
+  predictionHistory: [],
   selectedBatchFile: null,
   lastBatchRendered: false,
   inlineLoaders: {}
@@ -31,6 +32,8 @@ const state = {
 
 const autocompleteTimers = {};
 const THEME_STORAGE_KEY = "synergylens-theme";
+const PREDICTION_HISTORY_KEY = "synergylens-recent-predictions";
+const MAX_PREDICTION_HISTORY = 5;
 const SAFETY_NOTE_TEXT = "This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.";
 const PREDICTION_FLOW_MESSAGES = [
   "Validating inputs",
@@ -107,6 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
   bindLiveValidation();
   bindActions();
   bindBatchUpload();
+  bindHistoryActions();
+  loadPredictionHistory();
+  renderPredictionHistory();
   refreshAllValidation();
   bootstrapBackendData();
 });
@@ -476,6 +482,204 @@ function setSelectValueWhenAvailable(id, value, preserveExisting = false) {
   window.setTimeout(apply, 250);
 }
 
+function bindHistoryActions() {
+  const list = document.getElementById("history-list");
+  if (list) {
+    list.addEventListener("click", (event) => {
+      const reloadButton = event.target.closest("[data-history-index]");
+      if (!reloadButton) {
+        return;
+      }
+      const index = Number(reloadButton.dataset.historyIndex);
+      reloadHistoryItem(index);
+    });
+  }
+
+  document.getElementById("clear-history-btn")?.addEventListener("click", clearPredictionHistory);
+}
+
+function loadPredictionHistory() {
+  let parsed = [];
+  try {
+    const raw = window.localStorage.getItem(PREDICTION_HISTORY_KEY);
+    parsed = raw ? JSON.parse(raw) : [];
+  } catch (error) {
+    parsed = [];
+  }
+
+  state.predictionHistory = Array.isArray(parsed)
+    ? parsed.map(normalizeHistoryRecord).filter(Boolean).slice(0, MAX_PREDICTION_HISTORY)
+    : [];
+  persistPredictionHistory();
+}
+
+function normalizeHistoryRecord(record) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const nsc1 = String(record.NSC1 ?? record.nsc1 ?? "").trim();
+  const nsc2 = String(record.NSC2 ?? record.nsc2 ?? "").trim();
+  const cellLine = String(record.CELLNAME ?? record.cellLine ?? record.cell_line ?? "").trim();
+  const score = Number(
+    record.final_predicted_COMBOSCORE ??
+    record.score ??
+    record.predicted_comboscore
+  );
+
+  if (!nsc1 || !nsc2 || !cellLine || !Number.isFinite(score)) {
+    return null;
+  }
+
+  const timestamp = Number.isFinite(Date.parse(record.timestamp))
+    ? new Date(record.timestamp).toISOString()
+    : new Date().toISOString();
+
+  return {
+    NSC1: nsc1,
+    NSC2: nsc2,
+    CELLNAME: cellLine,
+    model_used: String(record.model_used ?? record.model ?? "").trim(),
+    final_predicted_COMBOSCORE: score,
+    label: semanticLabelForScore(score),
+    timestamp
+  };
+}
+
+function savePredictionHistory(prediction) {
+  const record = normalizeHistoryRecord({
+    NSC1: prediction.nsc1,
+    NSC2: prediction.nsc2,
+    CELLNAME: prediction.cellLine,
+    model_used: prediction.model,
+    final_predicted_COMBOSCORE: prediction.score,
+    label: semanticLabelForScore(prediction.score),
+    timestamp: new Date().toISOString()
+  });
+
+  if (!record) {
+    return;
+  }
+
+  state.predictionHistory = [record]
+    .concat(state.predictionHistory)
+    .slice(0, MAX_PREDICTION_HISTORY);
+  persistPredictionHistory();
+  renderPredictionHistory();
+}
+
+function persistPredictionHistory() {
+  try {
+    window.localStorage.setItem(PREDICTION_HISTORY_KEY, JSON.stringify(state.predictionHistory));
+  } catch (error) {
+    // History is a convenience feature; prediction should still work if storage is blocked.
+  }
+}
+
+function renderPredictionHistory() {
+  const list = document.getElementById("history-list");
+  const clearButton = document.getElementById("clear-history-btn");
+  if (!list) {
+    return;
+  }
+
+  const records = state.predictionHistory
+    .map(normalizeHistoryRecord)
+    .filter(Boolean)
+    .slice(0, MAX_PREDICTION_HISTORY);
+  state.predictionHistory = records;
+
+  if (clearButton) {
+    clearButton.disabled = records.length === 0;
+  }
+
+  if (!records.length) {
+    list.innerHTML = `<div class="history-empty">Successful predictions will appear here.</div>`;
+    return;
+  }
+
+  list.innerHTML = records.map((record, index) => {
+    const label = semanticLabelForScore(record.final_predicted_COMBOSCORE);
+    const tone = historyToneForLabel(label);
+    return `
+      <article class="history-item">
+        <div class="history-item-top">
+          <strong>NSC ${escapeHtml(record.NSC1)} + NSC ${escapeHtml(record.NSC2)}</strong>
+          <span class="history-label history-label--${escapeAttribute(label)}">${escapeHtml(label)}</span>
+        </div>
+        <div class="history-meta">
+          <span>${escapeHtml(record.CELLNAME)}</span>
+          <span>Score ${escapeHtml(formatScore(record.final_predicted_COMBOSCORE, 3))}</span>
+          <span>${escapeHtml(record.model_used || "Auto model")}</span>
+          <span>${escapeHtml(formatHistoryTimestamp(record.timestamp))}</span>
+        </div>
+        <button type="button" class="history-reload-button ${escapeAttribute(tone)}" data-history-index="${index}">Reload</button>
+      </article>
+    `;
+  }).join("");
+}
+
+function reloadHistoryItem(index) {
+  const record = normalizeHistoryRecord(state.predictionHistory[index]);
+  if (!record) {
+    renderPredictionHistory();
+    return;
+  }
+
+  setDrugFieldValue("drug1-input", "drug1-id", record.NSC1);
+  setDrugFieldValue("drug2-input", "drug2-id", record.NSC2);
+  setSelectValueWhenAvailable("cell-line", record.CELLNAME, false);
+  clearAlert("predict-alert");
+  switchView("predict");
+  refreshAllValidation();
+  window.setTimeout(refreshAllValidation, 300);
+  document.getElementById("predict-btn")?.focus();
+}
+
+function setDrugFieldValue(inputId, hiddenId, nsc) {
+  const value = String(nsc ?? "").trim();
+  const input = document.getElementById(inputId);
+  const hidden = document.getElementById(hiddenId);
+  if (input) {
+    input.value = value ? `NSC ${value}` : "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  if (hidden) {
+    hidden.value = value;
+  }
+}
+
+function clearPredictionHistory() {
+  state.predictionHistory = [];
+  persistPredictionHistory();
+  renderPredictionHistory();
+}
+
+function historyToneForLabel(label) {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("synerg")) {
+    return "history-reload-button--synergy";
+  }
+  if (normalized.includes("antag")) {
+    return "history-reload-button--antagonism";
+  }
+  return "history-reload-button--neutral";
+}
+
+function formatHistoryTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "recently";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 function bindAutocomplete() {
   document.querySelectorAll("[data-drug-search]").forEach((input) => {
     input.addEventListener("input", () => handleDrugSearch(input));
@@ -777,6 +981,7 @@ async function runPredict() {
     state.lastPrediction = prediction;
     stopPredictionLoader();
     renderPrediction(prediction);
+    savePredictionHistory(prediction);
     syncSelectionsFromPredict();
   } catch (error) {
     stopPredictionLoader({ restorePanel: true });
