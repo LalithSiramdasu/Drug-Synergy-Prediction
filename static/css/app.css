@@ -1775,6 +1775,11 @@ input::placeholder {
   margin-top: 16px;
 }
 
+.sample-csv-button {
+  width: 100%;
+  margin-top: 14px;
+}
+
 .checklist {
   display: grid;
   gap: 12px;

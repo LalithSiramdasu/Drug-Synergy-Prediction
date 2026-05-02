@@ -677,12 +677,12 @@ function previewTable(rows) {
 }
 
 function downloadSampleCsv() {
-  const content = "NSC1,NSC2,CELLNAME\n740,750,786-0\n740,752,A498\n750,755,A549/ATCC\n";
+  const content = "NSC1,NSC2,CELLNAME\n740,750,786-0\n740,752,A498\n750,755,A549/ATCC";
   const blob = new Blob([content], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "nci_almanac_batch_sample.csv";
+  anchor.download = "batch_prediction_sample.csv";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

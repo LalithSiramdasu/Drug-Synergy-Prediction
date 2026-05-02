@@ -35,6 +35,8 @@ const THEME_STORAGE_KEY = "synergylens-theme";
 const PREDICTION_HISTORY_KEY = "synergylens-recent-predictions";
 const MAX_PREDICTION_HISTORY = 5;
 const SAFETY_NOTE_TEXT = "This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.";
+const SAMPLE_BATCH_CSV_FILENAME = "batch_prediction_sample.csv";
+const SAMPLE_BATCH_CSV_CONTENT = "NSC1,NSC2,CELLNAME\n740,750,786-0\n740,752,A498\n750,755,A549/ATCC";
 const PREDICTION_FLOW_MESSAGES = [
   "Validating inputs",
   "Building 526-feature vector",
@@ -915,6 +917,7 @@ function bindActions() {
   document.getElementById("explain-btn")?.addEventListener("click", runExplain);
   document.getElementById("drug-info-btn")?.addEventListener("click", loadDrugInfo);
   document.getElementById("batch-run-btn")?.addEventListener("click", runSelectedBatchFile);
+  document.getElementById("sample-csv-btn")?.addEventListener("click", downloadSampleBatchCsv);
   document.getElementById("download-btn")?.addEventListener("click", downloadBatchResults);
 }
 
@@ -1963,20 +1966,30 @@ function batchLabelForRow(row, fallbackLabel) {
 function downloadBatchResults() {
   if (state.batchBlob) {
     const url = URL.createObjectURL(state.batchBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "synergy_predictions.csv";
-    link.click();
+    triggerDownload(url, "synergy_predictions.csv");
     URL.revokeObjectURL(url);
     return;
   }
 
   if (state.batchDownloadUrl) {
-    const link = document.createElement("a");
-    link.href = state.batchDownloadUrl;
-    link.download = "synergy_predictions.csv";
-    link.click();
+    triggerDownload(state.batchDownloadUrl, "synergy_predictions.csv");
   }
+}
+
+function downloadSampleBatchCsv() {
+  const blob = new Blob([SAMPLE_BATCH_CSV_CONTENT], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, SAMPLE_BATCH_CSV_FILENAME);
+  URL.revokeObjectURL(url);
+}
+
+function triggerDownload(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 function makeDownloadUrl(outputFile) {
