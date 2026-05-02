@@ -103,6 +103,30 @@ const VALIDATION_GROUPS = {
 const NEUTRAL_THRESHOLD = 20;
 const SCORE_DISPLAY_MIN = -500;
 const SCORE_DISPLAY_MAX = 500;
+const DEFAULT_VIEW = "home";
+const VIEW_HASHES = {
+  home: "home",
+  predict: "predict",
+  drugs: "molecules",
+  explain: "explain-ai",
+  batch: "batch",
+  about: "about"
+};
+const VIEW_ALIASES = {
+  home: "home",
+  predict: "predict",
+  prediction: "predict",
+  drugs: "drugs",
+  drug: "drugs",
+  molecule: "drugs",
+  molecules: "drugs",
+  "drug-info": "drugs",
+  explain: "explain",
+  explainai: "explain",
+  "explain-ai": "explain",
+  batch: "batch",
+  about: "about"
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   bindThemeToggle();
@@ -121,12 +145,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function bindViewNavigation() {
   document.querySelectorAll("[data-view]").forEach((button) => {
-    button.addEventListener("click", () => switchView(button.dataset.view));
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      switchView(button.dataset.view);
+    });
   });
 
   document.querySelectorAll("[data-view-trigger]").forEach((button) => {
-    button.addEventListener("click", () => switchView(button.dataset.viewTrigger));
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      switchView(button.dataset.viewTrigger);
+    });
   });
+
+  window.addEventListener("popstate", () => {
+    switchView(viewFromHash(), { updateHash: false, scroll: true });
+  });
+  window.addEventListener("hashchange", () => {
+    switchView(viewFromHash(), { updateHash: false, scroll: true });
+  });
+
+  switchView(viewFromHash(), { updateHash: false, scroll: false });
 }
 
 function bindThemeToggle() {
@@ -169,17 +208,71 @@ function applyTheme(theme) {
   refreshChartTheme();
 }
 
-function switchView(viewName) {
+function switchView(viewName, options = {}) {
+  const settings = {
+    updateHash: true,
+    scroll: true,
+    ...options
+  };
+  const normalizedView = normalizeViewName(viewName) || DEFAULT_VIEW;
+
   document.querySelectorAll(".view").forEach((view) => {
-    const isActive = view.id === `view-${viewName}`;
+    const isActive = view.id === `view-${normalizedView}`;
     view.classList.toggle("is-active", isActive);
     view.setAttribute("aria-hidden", String(!isActive));
   });
 
   document.querySelectorAll("[data-view]").forEach((button) => {
-    const isActive = button.dataset.view === viewName;
+    const isActive = normalizeViewName(button.dataset.view) === normalizedView;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-selected", String(isActive));
+  });
+
+  document.body.dataset.activeView = normalizedView;
+
+  if (settings.updateHash) {
+    pushViewHash(normalizedView);
+  }
+
+  if (settings.scroll) {
+    scrollToView(normalizedView);
+  }
+}
+
+function normalizeViewName(viewName) {
+  const cleaned = String(viewName || "")
+    .replace(/^#/, "")
+    .trim()
+    .toLowerCase();
+  return VIEW_ALIASES[cleaned] || "";
+}
+
+function viewFromHash() {
+  return normalizeViewName(window.location.hash);
+}
+
+function pushViewHash(viewName) {
+  const nextHash = `#${VIEW_HASHES[viewName] || viewName}`;
+  if (window.location.hash === nextHash) {
+    return;
+  }
+  window.history.pushState({ view: viewName }, "", nextHash);
+}
+
+function scrollToView(viewName) {
+  const target = viewName === "home"
+    ? document.querySelector(".hero")
+    : document.querySelector(".workspace-tabs");
+  if (!target) {
+    return;
+  }
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start"
+    });
   });
 }
 

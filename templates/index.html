@@ -62,6 +62,7 @@
         </p>
         <div class="hero-actions">
           <button type="button" class="ghost-button" data-view-trigger="predict">Start Prediction</button>
+          <button type="button" class="ghost-button ghost-button-secondary" data-view-trigger="batch">Open Batch</button>
           <button type="button" class="ghost-button ghost-button-secondary" data-view-trigger="about">About Project</button>
         </div>
       </div>
@@ -87,15 +88,54 @@
     </header>
 
     <nav class="workspace-tabs panel reveal reveal-delay-1" aria-label="Workspace sections" role="tablist">
-      <button type="button" class="tab-button is-active" id="tab-predict" data-view="predict" role="tab" aria-controls="view-predict" aria-selected="true">Predict</button>
-      <button type="button" class="tab-button" id="tab-explain" data-view="explain" role="tab" aria-controls="view-explain" aria-selected="false">Explain</button>
-      <button type="button" class="tab-button" id="tab-drugs" data-view="drugs" role="tab" aria-controls="view-drugs" aria-selected="false">Drug Info</button>
+      <button type="button" class="tab-button is-active" id="tab-home" data-view="home" role="tab" aria-controls="view-home" aria-selected="true">Home</button>
+      <button type="button" class="tab-button" id="tab-predict" data-view="predict" role="tab" aria-controls="view-predict" aria-selected="false">Predict</button>
+      <button type="button" class="tab-button" id="tab-drugs" data-view="drugs" role="tab" aria-controls="view-drugs" aria-selected="false">Molecules</button>
+      <button type="button" class="tab-button" id="tab-explain" data-view="explain" role="tab" aria-controls="view-explain" aria-selected="false">Explain AI</button>
       <button type="button" class="tab-button" id="tab-batch" data-view="batch" role="tab" aria-controls="view-batch" aria-selected="false">Batch</button>
       <button type="button" class="tab-button" id="tab-about" data-view="about" role="tab" aria-controls="view-about" aria-selected="false">About</button>
     </nav>
 
     <main class="workspace">
-      <section id="view-predict" class="view is-active" role="tabpanel" aria-labelledby="tab-predict" aria-hidden="false">
+      <section id="view-home" class="view is-active" role="tabpanel" aria-labelledby="tab-home" aria-hidden="false">
+        <div class="home-grid">
+          <article class="panel home-intro reveal">
+            <span class="section-kicker">Workspace Home</span>
+            <h2 class="section-title">Choose a SynergyLens workflow</h2>
+            <p class="section-copy">Jump between prediction, molecule lookup, Explain AI, and batch processing while keeping each result in place.</p>
+            <div class="home-actions">
+              <button type="button" class="primary-button" data-view-trigger="predict">Start Prediction</button>
+              <button type="button" class="secondary-button" data-view-trigger="batch">Open Batch</button>
+            </div>
+          </article>
+          <article class="panel home-route-card reveal reveal-delay-1">
+            <span class="mini-label">Predict</span>
+            <strong>ComboScore readout</strong>
+            <p>Run a paired drug prediction for a selected cell line.</p>
+            <button type="button" class="secondary-button" data-view-trigger="predict">Start Prediction</button>
+          </article>
+          <article class="panel home-route-card reveal reveal-delay-1">
+            <span class="mini-label">Molecules</span>
+            <strong>Compound profiles</strong>
+            <p>View RDKit structure cards and molecule metadata.</p>
+            <button type="button" class="secondary-button" data-view-trigger="drugs">View Molecules</button>
+          </article>
+          <article class="panel home-route-card reveal reveal-delay-2">
+            <span class="mini-label">Explain AI</span>
+            <strong>SHAP contributors</strong>
+            <p>Inspect features that push ComboScore upward or downward.</p>
+            <button type="button" class="secondary-button" data-view-trigger="explain">Explain AI</button>
+          </article>
+          <article class="panel home-route-card reveal reveal-delay-2">
+            <span class="mini-label">Batch</span>
+            <strong>CSV processing</strong>
+            <p>Upload multiple drug pairs and download processed output.</p>
+            <button type="button" class="secondary-button" data-view-trigger="batch">Open Batch</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-predict" class="view" role="tabpanel" aria-labelledby="tab-predict" aria-hidden="true">
         <div class="workspace-grid workspace-grid--main">
           <aside class="panel control-panel reveal">
             <div class="section-header">
