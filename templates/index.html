@@ -190,6 +190,10 @@
                   <article class="context-tile"><span>Cell Line</span><strong id="r-cell-tile">Pending</strong></article>
                   <article class="context-tile"><span>Model</span><strong id="r-cancer-tile">Pending</strong></article>
                 </div>
+                <aside class="safety-note" aria-label="Prediction safety note">
+                  <span>Screening confidence: model-based estimate, not a calibrated probability</span>
+                  <p>This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.</p>
+                </aside>
                 <article class="interpretation-card"><span class="section-kicker">Interpretation</span><div id="score-summary" class="result-story">The model interpretation will appear here after prediction.</div></article>
               </div>
             </article>
@@ -255,6 +259,10 @@
                 <article class="meta-card"><span>Base Value</span><strong id="shap-base">--</strong></article>
               </div>
               <p id="shap-base-info" class="footnote">No explanation computed yet.</p>
+              <aside class="safety-note safety-note--compact" aria-label="Explain AI safety note">
+                <span>Screening confidence: model-based estimate, not a calibrated probability</span>
+                <p>This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.</p>
+              </aside>
             </div>
           </article>
         </div>
@@ -354,6 +362,10 @@
           </div>
           <div id="batch-result" class="batch-result">
             <div class="batch-stats" id="batch-stats"></div>
+            <aside class="safety-note safety-note--compact" aria-label="Batch prediction safety note">
+              <span>Screening confidence: model-based estimate, not a calibrated probability</span>
+              <p>This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.</p>
+            </aside>
             <div class="table-shell"><table id="batch-table"><thead><tr id="batch-thead"></tr></thead><tbody id="batch-tbody"></tbody></table></div>
           </div>
           <div id="batch-empty" class="empty-state empty-state--compact"><h3>Batch results will appear here</h3><p>Process a CSV to unlock the preview and download action.</p></div>
@@ -381,7 +393,7 @@
             <article class="mini-card">
               <span class="mini-label">Safety</span>
               <strong>Screening Only</strong>
-              <p>Predictions and SHAP explanations are prioritization support, not biological proof or clinical advice.</p>
+              <p>Predictions and SHAP explanations are machine-learning screening estimates, not calibrated probabilities, biological proof, or clinical advice. Promising synergy predictions should be validated experimentally.</p>
             </article>
           </div>
         </article>

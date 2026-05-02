@@ -31,6 +31,7 @@ const state = {
 
 const autocompleteTimers = {};
 const THEME_STORAGE_KEY = "synergylens-theme";
+const SAFETY_NOTE_TEXT = "This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.";
 const PREDICTION_FLOW_MESSAGES = [
   "Validating inputs",
   "Building 526-feature vector",
@@ -1077,7 +1078,7 @@ function buildPredictionStoryHtml(data) {
       Positive ComboScore suggests synergy, near zero suggests neutral or additive behavior,
       and negative ComboScore suggests antagonism.
     </p>
-    <p class="story-safety">This is an ML screening prediction, not biological proof or clinical advice.</p>
+    <p class="story-safety">${escapeHtml(SAFETY_NOTE_TEXT)}</p>
   `;
 }
 
