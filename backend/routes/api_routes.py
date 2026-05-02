@@ -7,6 +7,7 @@ from backend.services.batch_service import BatchPredictionError, run_batch_predi
 from backend.services.data_loader import build_health_report, get_available_cell_lines, get_available_drugs
 from backend.services.demo_service import DemoCaseError, get_demo_cases
 from backend.services.model_loader import ModelLoaderError, get_model_info
+from backend.services.model_performance_service import build_model_performance_summary
 from backend.services.molecule_service import MoleculeError, get_molecule, get_molecule_pair, get_two_molecules
 from backend.services.prediction_service import PredictionError, predict_single
 from backend.services.shap_service import ShapExplanationError, explain_prediction
@@ -31,6 +32,13 @@ def health():
 @api_bp.get("/api/system-summary")
 def system_summary():
     summary = build_system_summary()
+    status_code = 200 if summary["status"] == "success" else 503
+    return jsonify(summary), status_code
+
+
+@api_bp.get("/api/model-performance-summary")
+def model_performance_summary():
+    summary = build_model_performance_summary()
     status_code = 200 if summary["status"] == "success" else 503
     return jsonify(summary), status_code
 

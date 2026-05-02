@@ -450,6 +450,55 @@
             </article>
           </div>
         </article>
+
+        <article class="panel model-performance-panel reveal reveal-delay-1">
+          <div class="panel-header panel-header--spread">
+            <div>
+              <span class="section-kicker">Model Performance</span>
+              <h2 class="section-title">Project Transparency</h2>
+              <p class="section-copy" id="model-performance-explanation">Loading final model summary...</p>
+            </div>
+            <span class="status-pill tone-neutral" id="model-performance-status">Loading</span>
+          </div>
+
+          <div class="performance-metric-grid">
+            <article class="stat-card"><strong id="performance-cell-lines">--</strong><span>Total Cell Lines</span></article>
+            <article class="stat-card"><strong id="performance-drugs">--</strong><span>Total Drugs</span></article>
+            <article class="stat-card"><strong id="performance-features">--</strong><span>Feature Vector</span></article>
+            <article class="stat-card"><strong id="performance-models">--</strong><span>Final Models</span></article>
+          </div>
+
+          <div class="model-performance-layout">
+            <article class="performance-card">
+              <h3>Model Types Used</h3>
+              <p>Final Step 6 deployment uses one selected model per cell line.</p>
+              <div id="model-type-counts" class="model-count-list">
+                <span class="model-count-empty">Loading model counts...</span>
+              </div>
+            </article>
+
+            <article class="performance-card">
+              <h3>Average Test Performance</h3>
+              <p id="performance-average-summary">Loading performance metrics...</p>
+              <div class="table-shell performance-table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Mean R2</th>
+                      <th>Mean Pearson Rp</th>
+                      <th>Mean RMSE</th>
+                      <th>Mean MAE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="performance-table-body">
+                    <tr><td colspan="5">Loading model performance...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </article>
       </section>
     </main>
   </div>

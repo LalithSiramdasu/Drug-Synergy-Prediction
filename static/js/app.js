@@ -7,6 +7,7 @@ const API = {
   moleculePair: "/api/molecule-pair",
   batch: "/api/batch-predict",
   demoCases: "/api/demo-cases",
+  modelPerformance: "/api/model-performance-summary",
   download: "/api/download/"
 };
 
@@ -27,6 +28,7 @@ const state = {
   predictionHistory: [],
   selectedBatchFile: null,
   lastBatchRendered: false,
+  modelPerformance: null,
   inlineLoaders: {}
 };
 
@@ -281,7 +283,8 @@ async function bootstrapBackendData() {
     loadHealth(),
     loadDrugs(),
     loadCellLines(),
-    loadDemoCases()
+    loadDemoCases(),
+    loadModelPerformance()
   ]);
 }
 
@@ -342,6 +345,125 @@ function renderBackendHealthError(message) {
   setText("health-drugs", "--");
   setText("health-features", "--");
   updateBackendHealthTone("danger", "Error");
+}
+
+async function loadModelPerformance() {
+  try {
+    const data = await apiJson(API.modelPerformance);
+    state.modelPerformance = data;
+    renderModelPerformance(data);
+  } catch (error) {
+    renderModelPerformanceError(error.message);
+  }
+}
+
+function renderModelPerformance(data) {
+  const assets = data.assets || {};
+  const modelSummary = data.model_summary || {};
+  const performance = data.performance || {};
+  const deployedAverage = performance.deployed_final_average || {};
+
+  setText("performance-cell-lines", assets.total_cell_lines ?? "--");
+  setText("performance-drugs", assets.total_drugs ?? "--");
+  setText("performance-features", `${assets.feature_vector ?? "--"} features`);
+  setText("performance-models", assets.final_model_count ?? modelSummary.total_models ?? "--");
+  setText("model-performance-explanation", data.explanation || "Model performance summary loaded from project result files.");
+  setText("performance-average-summary", formatPerformanceSummary(deployedAverage));
+
+  const status = document.getElementById("model-performance-status");
+  if (status) {
+    status.textContent = "Loaded";
+    setToneClass(status, "success");
+  }
+
+  renderModelTypeCounts(modelSummary.count_per_model_type || {});
+  renderPerformanceRows(performance.by_model_type || []);
+}
+
+function renderModelPerformanceError(message) {
+  setText("model-performance-explanation", "Model performance summary could not be loaded.");
+  setText("performance-average-summary", cleanError(message));
+  const status = document.getElementById("model-performance-status");
+  if (status) {
+    status.textContent = "Unavailable";
+    setToneClass(status, "danger");
+  }
+
+  const modelCounts = document.getElementById("model-type-counts");
+  if (modelCounts) {
+    modelCounts.innerHTML = `<span class="model-count-empty">${escapeHtml(cleanError(message))}</span>`;
+  }
+
+  const tableBody = document.getElementById("performance-table-body");
+  if (tableBody) {
+    tableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(cleanError(message))}</td></tr>`;
+  }
+}
+
+function renderModelTypeCounts(counts) {
+  const container = document.getElementById("model-type-counts");
+  if (!container) {
+    return;
+  }
+
+  const preferredOrder = ["CatBoost", "LightGBM", "RandomForest", "XGBoost"];
+  const entries = Object.entries(counts).sort((a, b) => {
+    const aIndex = preferredOrder.indexOf(a[0]);
+    const bIndex = preferredOrder.indexOf(b[0]);
+    return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+  });
+
+  if (!entries.length) {
+    container.innerHTML = `<span class="model-count-empty">No model count data returned.</span>`;
+    return;
+  }
+
+  container.innerHTML = entries.map(([model, count]) => `
+    <div class="model-count-row">
+      <span>${escapeHtml(model)}</span>
+      <strong>${escapeHtml(String(count))}</strong>
+    </div>
+  `).join("");
+}
+
+function renderPerformanceRows(rows) {
+  const tableBody = document.getElementById("performance-table-body");
+  if (!tableBody) {
+    return;
+  }
+
+  if (!rows.length) {
+    tableBody.innerHTML = `<tr><td colspan="5">Average performance metrics are unavailable.</td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.model || "")}</td>
+      <td class="mono">${escapeHtml(formatMetric(row.mean_r2_score, 3))}</td>
+      <td class="mono">${escapeHtml(formatMetric(row.mean_pearson_rp, 3))}</td>
+      <td class="mono">${escapeHtml(formatMetric(row.mean_rmse, 2))}</td>
+      <td class="mono">${escapeHtml(formatMetric(row.mean_mae, 2))}</td>
+    </tr>
+  `).join("");
+}
+
+function formatPerformanceSummary(summary) {
+  if (!summary || !Number.isFinite(Number(summary.mean_r2_score))) {
+    return "Average performance metrics are loaded from saved project result files when available.";
+  }
+
+  return [
+    `Final deployed models average R2 ${formatMetric(summary.mean_r2_score, 3)}`,
+    `Pearson Rp ${formatMetric(summary.mean_pearson_rp, 3)}`,
+    `RMSE ${formatMetric(summary.mean_rmse, 2)}`,
+    `MAE ${formatMetric(summary.mean_mae, 2)}`
+  ].join(" | ");
+}
+
+function formatMetric(value, digits = 3) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : "n/a";
 }
 
 function updateBackendHealthTone(level, badgeText) {

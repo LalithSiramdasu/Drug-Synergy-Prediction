@@ -677,6 +677,7 @@ body.is-ready .workspace-tabs.reveal,
 .drug-panel,
 .batch-panel,
 .about-panel,
+.model-performance-panel,
 .home-intro,
 .home-route-card {
   min-width: 0;
@@ -687,6 +688,79 @@ body.is-ready .workspace-tabs.reveal,
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.model-performance-panel {
+  margin-top: 20px;
+}
+
+.performance-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.model-performance-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
+  gap: 16px;
+}
+
+.performance-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.performance-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+  letter-spacing: 0;
+}
+
+.performance-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.model-count-list {
+  display: grid;
+  gap: 10px;
+}
+
+.model-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-muted);
+}
+
+.model-count-row span {
+  color: var(--muted-strong);
+}
+
+.model-count-row strong {
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 1.05rem;
+}
+
+.model-count-empty {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.performance-table-shell {
+  max-height: 360px;
 }
 
 .section-header,
@@ -2003,6 +2077,8 @@ body[data-theme="dark"] .drug-card-header h3 {
   .hero-metrics,
   .mini-grid,
   .about-grid,
+  .performance-metric-grid,
+  .model-performance-layout,
   .context-grid,
   .batch-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2032,7 +2108,8 @@ body[data-theme="dark"] .drug-card-header h3 {
   .chart-panel,
   .drug-panel,
   .batch-panel,
-  .about-panel {
+  .about-panel,
+  .model-performance-panel {
     padding: 22px;
   }
 
@@ -2063,6 +2140,8 @@ body[data-theme="dark"] .drug-card-header h3 {
   .hero-metrics,
   .mini-grid,
   .about-grid,
+  .performance-metric-grid,
+  .model-performance-layout,
   .context-grid,
   .batch-stats {
     grid-template-columns: 1fr;
@@ -2106,7 +2185,8 @@ body[data-theme="dark"] .drug-card-header h3 {
   .chart-panel,
   .drug-panel,
   .batch-panel,
-  .about-panel {
+  .about-panel,
+  .model-performance-panel {
     padding: 18px;
     border-radius: 24px;
   }
