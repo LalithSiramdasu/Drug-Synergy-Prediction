@@ -1134,6 +1134,7 @@ function bindActions() {
   document.getElementById("batch-run-btn")?.addEventListener("click", runSelectedBatchFile);
   document.getElementById("sample-csv-btn")?.addEventListener("click", downloadSampleBatchCsv);
   document.getElementById("download-btn")?.addEventListener("click", downloadBatchResults);
+  document.getElementById("prediction-report-btn")?.addEventListener("click", downloadPredictionReport);
 }
 
 function bindBatchUpload() {
@@ -1457,6 +1458,7 @@ function renderPrediction(data) {
   setText("r-cell-tile", data.cellLine);
   setText("r-cancer-tile", data.model || "Auto-selected model");
   renderPredictionStory(data);
+  updatePredictionReportButton(true);
 
   const pill = document.getElementById("score-pill");
   setToneClass(pill, data.level);
@@ -1503,6 +1505,184 @@ function buildPredictionStoryHtml(data) {
     </p>
     <p class="story-safety">${escapeHtml(SAFETY_NOTE_TEXT)}</p>
   `;
+}
+
+function updatePredictionReportButton(isEnabled) {
+  const button = document.getElementById("prediction-report-btn");
+  if (!button) {
+    return;
+  }
+
+  button.disabled = !isEnabled;
+}
+
+function downloadPredictionReport() {
+  if (!state.lastPrediction) {
+    showAlert("predict-alert", "Run a successful prediction before downloading a report.");
+    updatePredictionReportButton(false);
+    return;
+  }
+
+  const reportHtml = buildPredictionReportHtml(state.lastPrediction);
+  const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, predictionReportFilename());
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function buildPredictionReportHtml(data) {
+  const generatedAt = new Date();
+  const storyLabel = storyLabelForPrediction(data.label, data.score);
+  const scoreMeaning = scoreMeaningForScore(data.score);
+  const finalScore = formatScore(data.score, 3);
+  const forward = formatScore(data.forward, 3);
+  const reverse = formatScore(data.reverse, 3);
+  const modelPath = data.modelPath || "Not provided";
+  const generatedAtText = generatedAt.toLocaleString();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SynergyLens Prediction Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #18312c;
+      --muted: #5f716d;
+      --accent: #0f766e;
+      --danger: #c74747;
+      --border: #dbe6e2;
+      --surface: #f7faf8;
+    }
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+    }
+    h1, h2 {
+      margin: 0;
+      line-height: 1.15;
+    }
+    h1 {
+      font-size: 34px;
+      color: var(--accent);
+    }
+    h2 {
+      margin-top: 28px;
+      font-size: 18px;
+    }
+    .meta {
+      margin-top: 8px;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .card {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .card strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+    .score {
+      font-size: 28px;
+      color: ${escapeHtml(colorForCategory(data.category, data.score))};
+    }
+    .safety {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--accent);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    @media print {
+      body { padding: 18px; }
+      .card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SynergyLens Prediction Report</h1>
+    <p class="meta">Generated: ${escapeHtml(generatedAtText)}</p>
+
+    <h2>Input</h2>
+    <div class="grid">
+      <div class="card"><span>NSC1</span><strong>${escapeHtml(String(data.nsc1))}</strong></div>
+      <div class="card"><span>NSC2</span><strong>${escapeHtml(String(data.nsc2))}</strong></div>
+      <div class="card"><span>Cell line</span><strong>${escapeHtml(data.cellLine)}</strong></div>
+      <div class="card"><span>Project</span><strong>SynergyLens</strong></div>
+    </div>
+
+    <h2>Model</h2>
+    <div class="grid">
+      <div class="card"><span>Model used</span><strong>${escapeHtml(data.model || "Auto-selected cell-line model")}</strong></div>
+      <div class="card"><span>Model path</span><strong>${escapeHtml(modelPath)}</strong></div>
+    </div>
+
+    <h2>Predictions</h2>
+    <div class="grid">
+      <div class="card"><span>NSC1 -&gt; NSC2 prediction</span><strong>${escapeHtml(forward)}</strong></div>
+      <div class="card"><span>NSC2 -&gt; NSC1 prediction</span><strong>${escapeHtml(reverse)}</strong></div>
+      <div class="card"><span>Final averaged ComboScore</span><strong class="score">${escapeHtml(finalScore)}</strong></div>
+      <div class="card"><span>Final label</span><strong>${escapeHtml(storyLabel)}</strong></div>
+    </div>
+
+    <h2>ComboScore Interpretation</h2>
+    <p>Positive ComboScore suggests synergy. Near zero ComboScore suggests neutral or additive behavior. Negative ComboScore suggests antagonism.</p>
+
+    <h2>Result Story</h2>
+    <p>
+      SynergyLens evaluated NSC ${escapeHtml(String(data.nsc1))} with NSC ${escapeHtml(String(data.nsc2))}
+      in the ${escapeHtml(data.cellLine)} cell line using the automatically selected
+      ${escapeHtml(data.model || "cell-line")} model.
+    </p>
+    <p>
+      The model predicted ${escapeHtml(forward)} for NSC ${escapeHtml(String(data.nsc1))} -&gt; NSC ${escapeHtml(String(data.nsc2))}
+      and ${escapeHtml(reverse)} for NSC ${escapeHtml(String(data.nsc2))} -&gt; NSC ${escapeHtml(String(data.nsc1))}.
+      The final averaged ComboScore is ${escapeHtml(finalScore)}, labeled ${escapeHtml(storyLabel)}.
+      ${escapeHtml(scoreMeaning)}
+    </p>
+
+    <div class="safety">
+      <strong>Safety note</strong>
+      <p>${escapeHtml(SAFETY_NOTE_TEXT)}</p>
+    </div>
+  </main>
+</body>
+</html>`;
+}
+
+function predictionReportFilename() {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
+  return `synergylens_prediction_report_${timestamp}.html`;
 }
 
 function storyLabelForPrediction(label, score) {

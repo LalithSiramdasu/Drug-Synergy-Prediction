@@ -1609,6 +1609,16 @@ input::placeholder {
   font-size: 0.94rem;
 }
 
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.report-download-button {
+  min-height: 48px;
+  border-radius: 16px;
+}
+
 .safety-note {
   display: grid;
   gap: 6px;
