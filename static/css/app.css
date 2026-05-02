@@ -153,6 +153,18 @@ body[data-theme="dark"] {
   display: none !important;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -2044,6 +2056,221 @@ body[data-theme="dark"] .drug-card-header h3 {
 .badge-neutral { background: var(--neutral-soft); color: var(--muted-strong); }
 .badge-antag { background: var(--danger-soft); color: var(--danger); }
 
+.project-chat-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.project-chat-launcher,
+.project-chat-panel {
+  pointer-events: auto;
+}
+
+.project-chat-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 18px 40px rgba(17, 94, 89, 0.26);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.project-chat-launcher:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 46px rgba(17, 94, 89, 0.30);
+}
+
+.project-chat-launcher-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #b7fff0;
+  box-shadow: 0 0 0 5px rgba(183, 255, 240, 0.18);
+}
+
+.project-chat-panel {
+  width: min(390px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 112px));
+  display: grid;
+  grid-template-rows: auto minmax(190px, 1fr) auto auto;
+  overflow: hidden;
+  background: var(--surface-floating);
+  border: 1px solid var(--border-strong);
+  border-radius: 28px;
+  box-shadow: 0 28px 76px rgba(21, 47, 41, 0.22);
+  backdrop-filter: blur(18px);
+  animation: view-panel-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.project-chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--row-divider);
+}
+
+.project-chat-header h2 {
+  margin: 8px 0 6px;
+  font-size: 1.18rem;
+  line-height: 1.1;
+}
+
+.project-chat-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.project-chat-close {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.project-chat-messages {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.project-chat-message {
+  max-width: 88%;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+}
+
+.project-chat-message p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.52;
+}
+
+.project-chat-message--assistant {
+  justify-self: start;
+  background: var(--surface-card);
+  color: var(--text);
+  border-bottom-left-radius: 7px;
+}
+
+.project-chat-message--user {
+  justify-self: end;
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  color: #fff;
+  border-color: transparent;
+  border-bottom-right-radius: 7px;
+}
+
+.project-chat-message--error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.project-chat-message--loading p::after {
+  content: "";
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: chat-ellipsis 1s steps(4, end) infinite;
+}
+
+.project-chat-suggestions {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 14px;
+  overflow-x: auto;
+}
+
+.project-chat-suggestions button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.project-chat-suggestions button:hover {
+  transform: translateY(-1px);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.project-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--row-divider);
+}
+
+.project-chat-form input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.project-chat-form button {
+  min-height: 46px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.project-chat-form button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+body[data-theme="dark"] .project-chat-panel {
+  box-shadow: 0 28px 78px rgba(2, 8, 9, 0.56);
+}
+
+@keyframes chat-ellipsis {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -2186,6 +2413,35 @@ body[data-theme="dark"] .drug-card-header h3 {
   .page-shell {
     width: min(100% - 14px, 100%);
     padding-bottom: 34px;
+  }
+
+  .project-chat-widget {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    justify-items: stretch;
+  }
+
+  .project-chat-launcher {
+    justify-content: center;
+  }
+
+  .project-chat-panel {
+    width: 100%;
+    max-height: calc(100vh - 96px);
+    border-radius: 24px;
+  }
+
+  .project-chat-header,
+  .project-chat-form {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .project-chat-messages,
+  .project-chat-suggestions {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
   .hero,

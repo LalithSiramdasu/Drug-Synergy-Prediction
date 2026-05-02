@@ -6,6 +6,7 @@ const API = {
   explain: "/api/explain",
   moleculePair: "/api/molecule-pair",
   batch: "/api/batch-predict",
+  chat: "/api/chat",
   demoCases: "/api/demo-cases",
   modelPerformance: "/api/model-performance-summary",
   download: "/api/download/"
@@ -29,6 +30,7 @@ const state = {
   selectedBatchFile: null,
   lastBatchRendered: false,
   modelPerformance: null,
+  projectChatBusy: false,
   inlineLoaders: {}
 };
 
@@ -139,6 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindActions();
   bindBatchUpload();
   bindHistoryActions();
+  bindProjectChat();
   loadPredictionHistory();
   renderPredictionHistory();
   refreshAllValidation();
@@ -1168,6 +1171,147 @@ function bindBatchUpload() {
       stageBatchFile(file);
     }
   });
+}
+
+function bindProjectChat() {
+  const toggle = document.getElementById("project-chat-toggle");
+  const close = document.getElementById("project-chat-close");
+  const form = document.getElementById("project-chat-form");
+  const suggestions = document.getElementById("project-chat-suggestions");
+
+  toggle?.addEventListener("click", () => toggleProjectChat());
+  close?.addEventListener("click", () => toggleProjectChat(false));
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendProjectChatMessage();
+  });
+
+  suggestions?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-question]");
+    if (!button) {
+      return;
+    }
+    sendProjectChatMessage(button.dataset.chatQuestion);
+  });
+}
+
+function toggleProjectChat(forceOpen) {
+  const panel = document.getElementById("project-chat-panel");
+  const toggle = document.getElementById("project-chat-toggle");
+  const input = document.getElementById("project-chat-input");
+  if (!panel) {
+    return;
+  }
+
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : panel.hidden;
+  panel.hidden = !shouldOpen;
+  toggle?.setAttribute("aria-expanded", String(shouldOpen));
+
+  if (shouldOpen) {
+    window.setTimeout(() => input?.focus(), 80);
+    scrollProjectChatToBottom();
+  }
+}
+
+async function sendProjectChatMessage(questionOverride) {
+  if (state.projectChatBusy) {
+    return;
+  }
+
+  const input = document.getElementById("project-chat-input");
+  const sendButton = document.getElementById("project-chat-send");
+  const question = String(questionOverride ?? input?.value ?? "").trim();
+  if (!question) {
+    return;
+  }
+
+  toggleProjectChat(true);
+  renderProjectChatMessage("user", question);
+  if (input) {
+    input.value = "";
+  }
+
+  state.projectChatBusy = true;
+  if (sendButton) {
+    sendButton.disabled = true;
+  }
+  renderProjectChatMessage("assistant", "Checking project notes...", { loading: true });
+
+  try {
+    const data = await apiJson(API.chat, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "project", question })
+    });
+    removeProjectChatLoading();
+    renderProjectChatMessage("assistant", data.answer || "I could not find a project answer for that question.");
+    renderProjectChatSuggestions(data.suggested_questions);
+  } catch (error) {
+    removeProjectChatLoading();
+    renderProjectChatMessage("assistant", error.message, { error: true });
+  } finally {
+    state.projectChatBusy = false;
+    if (sendButton) {
+      sendButton.disabled = false;
+    }
+    input?.focus();
+  }
+}
+
+function renderProjectChatMessage(role, message, options = {}) {
+  const messages = document.getElementById("project-chat-messages");
+  if (!messages) {
+    return;
+  }
+
+  const bubble = document.createElement("div");
+  const normalizedRole = role === "user" ? "user" : "assistant";
+  bubble.className = `project-chat-message project-chat-message--${normalizedRole}`;
+  if (options.error) {
+    bubble.classList.add("project-chat-message--error");
+  }
+  if (options.loading) {
+    bubble.classList.add("project-chat-message--loading");
+    bubble.dataset.chatLoading = "true";
+  }
+  bubble.innerHTML = `<p>${escapeHtml(message)}</p>`;
+  messages.appendChild(bubble);
+  scrollProjectChatToBottom();
+}
+
+function renderProjectChatSuggestions(suggestions) {
+  const container = document.getElementById("project-chat-suggestions");
+  if (!container) {
+    return;
+  }
+
+  const values = Array.isArray(suggestions) && suggestions.length
+    ? suggestions
+    : [
+        "What is ComboScore?",
+        "How does prediction work?",
+        "What does synergistic mean?",
+        "Is this clinical advice?",
+        "What is Explain AI?",
+        "What CSV format is required?"
+      ];
+
+  container.innerHTML = values
+    .slice(0, 6)
+    .map((question) => `<button type="button" data-chat-question="${escapeAttribute(question)}">${escapeHtml(question)}</button>`)
+    .join("");
+}
+
+function removeProjectChatLoading() {
+  document.querySelectorAll("[data-chat-loading='true']").forEach((node) => node.remove());
+}
+
+function scrollProjectChatToBottom() {
+  const messages = document.getElementById("project-chat-messages");
+  if (messages) {
+    messages.scrollTop = messages.scrollHeight;
+  }
 }
 
 async function runPredict() {

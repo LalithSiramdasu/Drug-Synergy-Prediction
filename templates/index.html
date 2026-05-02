@@ -505,5 +505,44 @@
       </section>
     </main>
   </div>
+
+  <aside class="project-chat-widget" aria-label="Project Assistant">
+    <button type="button" class="project-chat-launcher" id="project-chat-toggle" aria-expanded="false" aria-controls="project-chat-panel">
+      <span class="project-chat-launcher-dot" aria-hidden="true"></span>
+      Project Assistant
+    </button>
+
+    <section class="project-chat-panel" id="project-chat-panel" hidden>
+      <div class="project-chat-header">
+        <div>
+          <span class="section-kicker">Project Help</span>
+          <h2>Project Assistant</h2>
+          <p>Ask about SynergyLens, ComboScore, models, SHAP, batch format, and safety.</p>
+        </div>
+        <button type="button" class="project-chat-close" id="project-chat-close" aria-label="Close Project Assistant">Close</button>
+      </div>
+
+      <div class="project-chat-messages" id="project-chat-messages" aria-live="polite">
+        <div class="project-chat-message project-chat-message--assistant">
+          <p>Hello. I can answer general project questions about SynergyLens, ComboScore, model flow, Explain AI, batch CSV format, and safety.</p>
+        </div>
+      </div>
+
+      <div class="project-chat-suggestions" id="project-chat-suggestions" aria-label="Suggested project questions">
+        <button type="button" data-chat-question="What is ComboScore?">What is ComboScore?</button>
+        <button type="button" data-chat-question="How does prediction work?">How does prediction work?</button>
+        <button type="button" data-chat-question="What does synergistic mean?">What does synergistic mean?</button>
+        <button type="button" data-chat-question="Is this clinical advice?">Is this clinical advice?</button>
+        <button type="button" data-chat-question="What is Explain AI?">What is Explain AI?</button>
+        <button type="button" data-chat-question="What CSV format is required?">What CSV format is required?</button>
+      </div>
+
+      <form class="project-chat-form" id="project-chat-form">
+        <label class="sr-only" for="project-chat-input">Ask the Project Assistant</label>
+        <input type="text" id="project-chat-input" placeholder="Ask a project question..." autocomplete="off">
+        <button type="submit" id="project-chat-send">Send</button>
+      </form>
+    </section>
+  </aside>
 </body>
 </html>
