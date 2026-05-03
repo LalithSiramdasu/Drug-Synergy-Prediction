@@ -167,6 +167,15 @@ body[data-theme="dark"] {
 
 html {
   scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 body {
@@ -180,6 +189,8 @@ body {
     linear-gradient(180deg, var(--page-gradient-start) 0%, var(--page-gradient-mid) 46%, var(--page-gradient-end) 100%);
   transition: background 240ms ease, color 240ms ease;
   overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 body::before {
@@ -689,6 +700,7 @@ body.is-ready .workspace-tabs.reveal,
 .drug-panel,
 .batch-panel,
 .about-panel,
+.prediction-assistant-panel,
 .model-performance-panel,
 .home-intro,
 .home-route-card {
@@ -1326,6 +1338,11 @@ input::placeholder {
 .tone-neutral { background: var(--neutral-soft); color: var(--muted-strong); }
 .tone-danger { background: var(--danger-soft); color: var(--danger); }
 
+#prediction-chat-status {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .empty-state {
   display: grid;
   place-items: center;
@@ -1625,12 +1642,20 @@ input::placeholder {
 
 .report-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
-.report-download-button {
+.report-download-button,
+.prediction-assistant-button {
   min-height: 48px;
   border-radius: 16px;
+}
+
+.prediction-assistant-button {
+  margin-left: auto;
 }
 
 .safety-note {
@@ -1962,6 +1987,12 @@ input::placeholder {
   margin-top: 20px;
 }
 
+.batch-panel,
+.batch-result,
+.batch-table-scroll {
+  min-width: 0;
+}
+
 .batch-result {
   display: none;
 }
@@ -1988,15 +2019,77 @@ input::placeholder {
 }
 
 .table-shell {
-  overflow: auto;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--surface-table);
+  overscroll-behavior-inline: contain;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.batch-table-scroll {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.batch-table-scroll::-webkit-scrollbar {
+  display: block !important;
+  height: 12px;
+  width: 12px;
+}
+
+.batch-table-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 118, 110, 0.08);
+  border-radius: 999px;
+}
+
+.batch-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+#batch-table {
+  width: max-content;
+  min-width: 1600px;
+  max-width: none;
+  table-layout: auto;
+}
+
+.batch-table-scroll table {
+  width: max-content;
+  min-width: 1600px;
+  max-width: none;
+  table-layout: auto;
+}
+
+#batch-table th,
+#batch-table td {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.batch-scroll-hint {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0;
 }
 
 th,
@@ -2085,12 +2178,18 @@ body[data-theme="dark"] .drug-card-header h3 {
   font-weight: 700;
   box-shadow: 0 18px 40px rgba(17, 94, 89, 0.26);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .project-chat-launcher:hover {
   transform: translateY(-1px);
   box-shadow: 0 22px 46px rgba(17, 94, 89, 0.30);
+}
+
+.project-chat-launcher:active {
+  cursor: grabbing;
 }
 
 .project-chat-launcher-dot {
@@ -2102,17 +2201,62 @@ body[data-theme="dark"] .drug-card-header h3 {
 }
 
 .project-chat-panel {
+  position: relative;
   width: min(390px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 112px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  min-width: min(320px, calc(100vw - 24px));
+  min-height: min(420px, calc(100vh - 112px));
   display: grid;
-  grid-template-rows: auto minmax(190px, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   overflow: hidden;
+  overflow-x: hidden;
   background: var(--surface-floating);
   border: 1px solid var(--border-strong);
   border-radius: 28px;
   box-shadow: 0 28px 76px rgba(21, 47, 41, 0.22);
   backdrop-filter: blur(18px);
   animation: view-panel-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.project-chat-resize-handle {
+  position: absolute;
+  z-index: 2;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.project-chat-resize-handle--right {
+  top: 72px;
+  right: 0;
+  bottom: 58px;
+  width: 12px;
+  cursor: ew-resize;
+}
+
+.project-chat-resize-handle--bottom {
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.project-chat-resize-handle--corner {
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  border-right: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  border-radius: 0 0 10px 0;
+  cursor: nwse-resize;
+  opacity: 0.75;
+}
+
+.project-chat-resize-handle--corner:hover {
+  opacity: 1;
 }
 
 .project-chat-header {
@@ -2122,6 +2266,10 @@ body[data-theme="dark"] .drug-card-header h3 {
   gap: 14px;
   padding: 18px 18px 14px;
   border-bottom: 1px solid var(--row-divider);
+}
+
+.project-chat-header > div {
+  min-width: 0;
 }
 
 .project-chat-header h2 {
@@ -2138,6 +2286,7 @@ body[data-theme="dark"] .drug-card-header h3 {
 }
 
 .project-chat-close {
+  flex: 0 0 auto;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -2155,20 +2304,47 @@ body[data-theme="dark"] .drug-card-header h3 {
   gap: 10px;
   padding: 16px 18px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  min-width: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.project-chat-messages::-webkit-scrollbar,
+.project-chat-suggestions::-webkit-scrollbar,
+.prediction-chat-messages::-webkit-scrollbar,
+.prediction-chat-suggestions::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .project-chat-message {
-  max-width: 88%;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(92%, 650px);
+  max-height: none;
+  min-width: 0;
   padding: 11px 13px;
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--shadow-soft);
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  animation: chat-message-in 180ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 .project-chat-message p {
   margin: 0;
+  max-height: none;
   font-size: 0.92rem;
   line-height: 1.52;
+  white-space: pre-wrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .project-chat-message--assistant {
@@ -2191,33 +2367,73 @@ body[data-theme="dark"] .drug-card-header h3 {
   color: var(--danger);
 }
 
-.project-chat-message--loading p::after {
-  content: "";
-  display: inline-block;
-  width: 1.2em;
-  text-align: left;
-  animation: chat-ellipsis 1s steps(4, end) infinite;
+.project-chat-suggestions {
+  display: grid;
+  gap: 9px;
+  padding: 0 18px 14px;
+  overflow-x: hidden;
+  min-width: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.project-chat-suggestions {
+.project-chat-suggestion-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.project-chat-topics,
+.project-chat-topic-questions {
   display: flex;
-  gap: 8px;
-  padding: 0 18px 14px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .project-chat-suggestions button {
-  flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 11px;
+  max-width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface-card);
   color: var(--muted-strong);
-  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: normal;
+  text-align: left;
   transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.project-chat-topic-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
+.project-chat-topic-btn.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(17, 94, 89, 0.16);
+}
+
+.project-chat-question-btn {
+  min-height: 31px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.project-chat-more-btn {
+  min-height: 31px;
+  padding: 0 10px;
+  border-style: dashed !important;
+  font-size: 0.76rem;
 }
 
 .project-chat-suggestions button:hover {
@@ -2226,16 +2442,24 @@ body[data-theme="dark"] .drug-card-header h3 {
   color: var(--accent-strong);
 }
 
+.project-chat-topic-btn.is-active:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  color: #fff;
+}
+
 .project-chat-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  min-width: 0;
   padding: 14px 18px 18px;
   border-top: 1px solid var(--row-divider);
+  overflow-x: hidden;
 }
 
 .project-chat-form input {
   width: 100%;
+  min-width: 0;
   min-height: 46px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
@@ -2245,6 +2469,7 @@ body[data-theme="dark"] .drug-card-header h3 {
 }
 
 .project-chat-form button {
+  white-space: nowrap;
   min-height: 46px;
   padding: 0 15px;
   border: 0;
@@ -2262,6 +2487,225 @@ body[data-theme="dark"] .drug-card-header h3 {
 
 body[data-theme="dark"] .project-chat-panel {
   box-shadow: 0 28px 78px rgba(2, 8, 9, 0.56);
+}
+
+.prediction-assistant {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
+.prediction-assistant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.prediction-assistant-header h3 {
+  margin: 8px 0 6px;
+  font-size: 1.16rem;
+  line-height: 1.1;
+}
+
+.prediction-assistant-header p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.prediction-chat-context {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.prediction-chat-context span {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-glass);
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.prediction-chat-context strong {
+  color: var(--text);
+}
+
+.prediction-chat-messages {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 170px;
+  max-height: 320px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-glass);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.prediction-chat-message {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(92%, 720px);
+  max-height: none;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  animation: chat-message-in 180ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.prediction-chat-message p {
+  margin: 0;
+  max-height: none;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.prediction-chat-message--assistant {
+  justify-self: start;
+  background: var(--surface-strong);
+  color: var(--text);
+  border-bottom-left-radius: 7px;
+}
+
+.prediction-chat-message--user {
+  justify-self: end;
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  color: #fff;
+  border-color: transparent;
+  border-bottom-right-radius: 7px;
+}
+
+.prediction-chat-message--error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.prediction-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.prediction-chat-suggestions button {
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: normal;
+  text-align: left;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.prediction-chat-suggestions button:hover {
+  transform: translateY(-1px);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.prediction-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.prediction-chat-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.prediction-chat-form button {
+  white-space: nowrap;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.prediction-chat-form button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.chat-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 7px;
+  vertical-align: middle;
+}
+
+.chat-typing-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+  animation: chat-dot-pulse 900ms ease-in-out infinite;
+}
+
+.chat-typing-dots i:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.chat-typing-dots i:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes chat-message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chat-dot-pulse {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.38; }
+  40% { transform: translateY(-3px); opacity: 0.95; }
 }
 
 @keyframes chat-ellipsis {
@@ -2348,6 +2792,7 @@ body[data-theme="dark"] .project-chat-panel {
   .drug-panel,
   .batch-panel,
   .about-panel,
+  .prediction-assistant-panel,
   .model-performance-panel {
     padding: 22px;
   }
@@ -2390,6 +2835,10 @@ body[data-theme="dark"] .project-chat-panel {
     grid-template-columns: 1fr;
   }
 
+  .prediction-chat-context {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .drug-card-body {
     grid-template-columns: 1fr;
   }
@@ -2428,8 +2877,43 @@ body[data-theme="dark"] .project-chat-panel {
 
   .project-chat-panel {
     width: 100%;
-    max-height: calc(100vh - 96px);
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    min-height: min(420px, calc(100vh - 112px));
     border-radius: 24px;
+  }
+
+  .project-chat-resize-handle {
+    display: none;
+  }
+
+  .prediction-assistant {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .prediction-assistant-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .prediction-chat-context,
+  .prediction-chat-form {
+    grid-template-columns: 1fr;
+  }
+
+  .report-actions {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .report-actions .secondary-button,
+  .report-actions .primary-button {
+    width: 100%;
+  }
+
+  .prediction-assistant-button {
+    margin-left: 0;
   }
 
   .project-chat-header,
@@ -2454,6 +2938,7 @@ body[data-theme="dark"] .project-chat-panel {
   .drug-panel,
   .batch-panel,
   .about-panel,
+  .prediction-assistant-panel,
   .model-performance-panel {
     padding: 18px;
     border-radius: 24px;

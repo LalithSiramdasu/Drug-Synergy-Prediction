@@ -12,8 +12,13 @@ molecules/*.pkl
 molecules/*.sdf
 
 # Runtime/generated files
+.env
+*.env
+.gemini_keys.local
+*keys.local*
+*api_keys*
+*secrets*
 outputs/
 uploads/
 batch_output.csv
 flask-verify*.log
-

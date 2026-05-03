@@ -31,16 +31,116 @@ const state = {
   lastBatchRendered: false,
   modelPerformance: null,
   projectChatBusy: false,
+  projectChatTopic: "basics",
+  projectChatExpanded: false,
+  predictionChatBusy: false,
+  projectChatDrag: null,
+  projectChatResize: null,
+  projectChatSuppressClick: false,
   inlineLoaders: {}
 };
 
 const autocompleteTimers = {};
 const THEME_STORAGE_KEY = "synergylens-theme";
 const PREDICTION_HISTORY_KEY = "synergylens-recent-predictions";
+const PROJECT_ASSISTANT_POSITION_KEY = "synergylens-project-assistant-position";
+const PROJECT_ASSISTANT_SIZE_KEY = "synergylens-project-assistant-size";
+const PROJECT_ASSISTANT_VIEWPORT_MARGIN = 16;
 const MAX_PREDICTION_HISTORY = 5;
 const SAFETY_NOTE_TEXT = "This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.";
 const SAMPLE_BATCH_CSV_FILENAME = "batch_prediction_sample.csv";
 const SAMPLE_BATCH_CSV_CONTENT = "NSC1,NSC2,CELLNAME\n740,750,786-0\n740,752,A498\n750,755,A549/ATCC";
+const PROJECT_CHAT_TOPICS = {
+  basics: {
+    label: "Basics",
+    questions: [
+      "What is SynergyLens?",
+      "What is the purpose of this project?",
+      "What dataset is used?",
+      "What is NCI ALMANAC?",
+      "What is ComboScore?",
+      "What is NSC?",
+      "How many drugs are available?",
+      "How many cell lines are available?",
+      "What are the main project limitations?"
+    ]
+  },
+  prediction: {
+    label: "Prediction",
+    questions: [
+      "How does prediction work?",
+      "What inputs are required?",
+      "What happens after I enter NSC1, NSC2, and CELLNAME?",
+      "What does synergistic mean?",
+      "What does antagonistic mean?",
+      "What does neutral mean?",
+      "Why predict both directions?",
+      "What thresholds are used for labels?",
+      "What model was used?",
+      "How is the model selected?",
+      "Can I trust the prediction?",
+      "What should I check next after prediction?",
+      "What should be validated experimentally?"
+    ]
+  },
+  xai: {
+    label: "XAI",
+    questions: [
+      "What is Explain AI?",
+      "What is XAI?",
+      "What is SHAP?",
+      "How do I read XAI results?",
+      "What do positive XAI values mean?",
+      "What do negative XAI values mean?",
+      "Can XAI prove the biological mechanism?",
+      "Why are features named fingerprint feature or physicochemical feature?"
+    ]
+  },
+  batch: {
+    label: "Batch",
+    questions: [
+      "What is batch prediction?",
+      "What CSV format is required?",
+      "What columns are required in the batch CSV?",
+      "How do I download batch results?",
+      "Why did a batch row fail?",
+      "What does successful/failed mean in batch results?"
+    ]
+  },
+  molecules: {
+    label: "Molecules",
+    questions: [
+      "What is Molecule Lookup?",
+      "What molecule information is shown?",
+      "What does direct molecule match mean?",
+      "Why might molecule structure be unavailable?"
+    ]
+  },
+  backend: {
+    label: "Backend",
+    questions: [
+      "What files does the backend use?",
+      "What feature files are used?",
+      "What model files are used?",
+      "What is the model registry?",
+      "What is Step 6 model?",
+      "Are models cell-line specific?",
+      "What are 263 and 526 features?",
+      "What is the data flow from frontend to backend?"
+    ]
+  },
+  safety: {
+    label: "Safety",
+    questions: [
+      "Is this clinical advice?",
+      "Can this be used for treatment decisions?",
+      "Can I trust the prediction?",
+      "What should be validated experimentally?",
+      "What does screening confidence mean?",
+      "What are the limitations of ML predictions?"
+    ]
+  }
+};
 const PREDICTION_FLOW_MESSAGES = [
   "Validating inputs",
   "Building 526-feature vector",
@@ -54,7 +154,7 @@ const EXPLAIN_FLOW_MESSAGES = [
   "Validating prediction input",
   "Loading selected cell-line model",
   "Building 526-feature vector",
-  "Computing SHAP explanation",
+  "Computing XAI explanation",
   "Ranking top molecular contributors",
   "Preparing explainable AI story"
 ];
@@ -114,6 +214,7 @@ const VIEW_HASHES = {
   drugs: "molecules",
   explain: "explain-ai",
   batch: "batch",
+  "prediction-chat": "prediction-assistant",
   about: "about"
 };
 const VIEW_ALIASES = {
@@ -129,6 +230,9 @@ const VIEW_ALIASES = {
   explainai: "explain",
   "explain-ai": "explain",
   batch: "batch",
+  assistant: "prediction-chat",
+  "prediction-assistant": "prediction-chat",
+  "prediction-chat": "prediction-chat",
   about: "about"
 };
 
@@ -142,6 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindBatchUpload();
   bindHistoryActions();
   bindProjectChat();
+  bindPredictionChat();
   loadPredictionHistory();
   renderPredictionHistory();
   refreshAllValidation();
@@ -1138,6 +1243,7 @@ function bindActions() {
   document.getElementById("sample-csv-btn")?.addEventListener("click", downloadSampleBatchCsv);
   document.getElementById("download-btn")?.addEventListener("click", downloadBatchResults);
   document.getElementById("prediction-report-btn")?.addEventListener("click", downloadPredictionReport);
+  document.getElementById("open-prediction-assistant-btn")?.addEventListener("click", () => switchView("prediction-chat"));
 }
 
 function bindBatchUpload() {
@@ -1146,6 +1252,9 @@ function bindBatchUpload() {
   if (!zone || !input) {
     return;
   }
+
+  bindBatchTableScroll();
+  window.addEventListener("resize", requestBatchScrollRefresh, { passive: true });
 
   zone.addEventListener("dragover", (event) => {
     event.preventDefault();
@@ -1173,13 +1282,87 @@ function bindBatchUpload() {
   });
 }
 
+function bindBatchTableScroll() {
+  const container = document.getElementById("batch-table-scroll") || document.querySelector(".batch-table-scroll");
+  if (!container) {
+    return;
+  }
+
+  if (container.dataset.batchScrollBound !== "true") {
+    container.dataset.batchScrollBound = "true";
+    container.addEventListener("wheel", handleBatchTableWheel, { passive: false });
+  }
+
+  updateBatchScrollHint(container);
+}
+
+function requestBatchScrollRefresh() {
+  bindBatchTableScroll();
+  window.requestAnimationFrame(() => updateBatchScrollHint());
+}
+
+function updateBatchScrollHint(container = document.getElementById("batch-table-scroll")) {
+  const hint = document.getElementById("batch-scroll-hint");
+  if (!container || !hint) {
+    return;
+  }
+
+  const canScroll = container.scrollWidth > container.clientWidth + 1;
+  hint.hidden = !canScroll;
+}
+
+function handleBatchTableWheel(event) {
+  const container = event.currentTarget;
+  if (!container || container.scrollWidth <= container.clientWidth + 1) {
+    return;
+  }
+
+  const horizontalIntent = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+  let delta = horizontalIntent ? event.deltaX : 0;
+  if (!delta && event.shiftKey) {
+    delta = event.deltaY || event.deltaX;
+  }
+  if (!delta && !event.ctrlKey && Math.abs(event.deltaY) > 0) {
+    delta = event.deltaY;
+  }
+  if (!delta) {
+    return;
+  }
+
+  const maxScroll = container.scrollWidth - container.clientWidth;
+  const nextScroll = Math.max(0, Math.min(maxScroll, container.scrollLeft + delta));
+  if (nextScroll === container.scrollLeft) {
+    return;
+  }
+
+  container.scrollLeft = nextScroll;
+  event.preventDefault();
+}
+
 function bindProjectChat() {
   const toggle = document.getElementById("project-chat-toggle");
   const close = document.getElementById("project-chat-close");
   const form = document.getElementById("project-chat-form");
   const suggestions = document.getElementById("project-chat-suggestions");
+  const panel = document.getElementById("project-chat-panel");
 
-  toggle?.addEventListener("click", () => toggleProjectChat());
+  loadProjectAssistantSize();
+  loadProjectAssistantPosition();
+  bindProjectAssistantDrag(toggle);
+  bindProjectAssistantResize(panel);
+  window.addEventListener("resize", () => {
+    applyProjectAssistantSize(loadStoredProjectAssistantSize(), { persistCorrected: true });
+    applyProjectAssistantPosition(loadStoredProjectAssistantPosition(), { persistCorrected: true });
+  });
+
+  toggle?.addEventListener("click", (event) => {
+    if (state.projectChatSuppressClick) {
+      event.preventDefault();
+      state.projectChatSuppressClick = false;
+      return;
+    }
+    toggleProjectChat();
+  });
   close?.addEventListener("click", () => toggleProjectChat(false));
 
   form?.addEventListener("submit", (event) => {
@@ -1188,12 +1371,295 @@ function bindProjectChat() {
   });
 
   suggestions?.addEventListener("click", (event) => {
+    const topicButton = event.target.closest("[data-chat-topic]");
+    if (topicButton) {
+      state.projectChatTopic = topicButton.dataset.chatTopic;
+      state.projectChatExpanded = false;
+      renderProjectChatSuggestions();
+      return;
+    }
+
+    const moreButton = event.target.closest("[data-chat-more]");
+    if (moreButton) {
+      state.projectChatExpanded = !state.projectChatExpanded;
+      renderProjectChatSuggestions();
+      return;
+    }
+
     const button = event.target.closest("[data-chat-question]");
     if (!button) {
       return;
     }
     sendProjectChatMessage(button.dataset.chatQuestion);
   });
+
+  renderProjectChatSuggestions();
+}
+
+function bindProjectAssistantDrag(handle) {
+  const widget = document.querySelector(".project-chat-widget");
+  if (!handle || !widget) {
+    return;
+  }
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+
+    const rect = widget.getBoundingClientRect();
+    state.projectChatDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false
+    };
+    try {
+      handle.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Synthetic pointer events used by automated checks may not be capturable.
+    }
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    const drag = state.projectChatDrag;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 6) {
+      return;
+    }
+
+    drag.moved = true;
+    state.projectChatSuppressClick = true;
+    event.preventDefault();
+    applyProjectAssistantPosition({
+      left: drag.startLeft + deltaX,
+      top: drag.startTop + deltaY
+    });
+  });
+
+  const finishDrag = (event) => {
+    const drag = state.projectChatDrag;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const rect = widget.getBoundingClientRect();
+    if (drag.moved) {
+      saveProjectAssistantPosition({ left: rect.left, top: rect.top });
+    }
+    state.projectChatDrag = null;
+    try {
+      handle.releasePointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Ignore release failures for synthetic or already-ended pointer captures.
+    }
+  };
+
+  handle.addEventListener("pointerup", finishDrag);
+  handle.addEventListener("pointercancel", finishDrag);
+}
+
+function bindProjectAssistantResize(panel) {
+  if (!panel) {
+    return;
+  }
+
+  panel.querySelectorAll("[data-chat-resize]").forEach((handle) => {
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== undefined && event.button !== 0) {
+        return;
+      }
+
+      const rect = panel.getBoundingClientRect();
+      state.projectChatResize = {
+        pointerId: event.pointerId,
+        direction: handle.dataset.chatResize || "corner",
+        startX: event.clientX,
+        startY: event.clientY,
+        startWidth: rect.width,
+        startHeight: rect.height,
+        startLeft: rect.left,
+        startTop: rect.top
+      };
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        handle.setPointerCapture?.(event.pointerId);
+      } catch (error) {
+        // Synthetic pointer events used by automated checks may not be capturable.
+      }
+    });
+
+    handle.addEventListener("pointermove", (event) => {
+      const resize = state.projectChatResize;
+      if (!resize || resize.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const deltaX = event.clientX - resize.startX;
+      const deltaY = event.clientY - resize.startY;
+      const direction = resize.direction;
+      const nextSize = {
+        width: direction === "right" || direction === "corner"
+          ? resize.startWidth + deltaX
+          : resize.startWidth,
+        height: direction === "bottom" || direction === "corner"
+          ? resize.startHeight + deltaY
+          : resize.startHeight
+      };
+
+      event.preventDefault();
+      applyProjectAssistantSize(nextSize);
+      applyProjectAssistantPosition({
+        left: resize.startLeft,
+        top: resize.startTop
+      });
+    });
+
+    const finishResize = (event) => {
+      const resize = state.projectChatResize;
+      if (!resize || resize.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const rect = panel.getBoundingClientRect();
+      saveProjectAssistantSize({ width: rect.width, height: rect.height });
+      saveProjectAssistantPosition({ left: rect.left, top: rect.top });
+      state.projectChatResize = null;
+      try {
+        handle.releasePointerCapture?.(event.pointerId);
+      } catch (error) {
+        // Ignore release failures for synthetic or already-ended pointer captures.
+      }
+    };
+
+    handle.addEventListener("pointerup", finishResize);
+    handle.addEventListener("pointercancel", finishResize);
+  });
+}
+
+function loadProjectAssistantSize() {
+  applyProjectAssistantSize(loadStoredProjectAssistantSize(), { persistCorrected: true });
+}
+
+function loadStoredProjectAssistantSize() {
+  try {
+    const raw = window.localStorage.getItem(PROJECT_ASSISTANT_SIZE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveProjectAssistantSize(size) {
+  try {
+    window.localStorage.setItem(PROJECT_ASSISTANT_SIZE_KEY, JSON.stringify(size));
+  } catch (error) {
+    // Size persistence is optional.
+  }
+}
+
+function projectAssistantSizeLimits() {
+  const margin = PROJECT_ASSISTANT_VIEWPORT_MARGIN;
+  const panel = document.getElementById("project-chat-panel");
+  const widget = document.querySelector(".project-chat-widget");
+  const panelRect = panel && !panel.hidden ? panel.getBoundingClientRect() : null;
+  const widgetRect = widget?.getBoundingClientRect();
+  const launcherGapHeight = panelRect && widgetRect
+    ? Math.max(0, widgetRect.height - panelRect.height)
+    : 0;
+  const maxWidth = Math.max(280, window.innerWidth - margin * 2);
+  const maxHeight = Math.max(280, window.innerHeight - margin * 2 - launcherGapHeight);
+  return {
+    margin,
+    minWidth: Math.min(320, maxWidth),
+    minHeight: Math.min(420, maxHeight),
+    maxWidth,
+    maxHeight
+  };
+}
+
+function applyProjectAssistantSize(size, options = {}) {
+  const panel = document.getElementById("project-chat-panel");
+  if (!panel) {
+    return;
+  }
+
+  const limits = projectAssistantSizeLimits();
+  panel.style.maxWidth = `${limits.maxWidth}px`;
+  panel.style.maxHeight = `${limits.maxHeight}px`;
+
+  const nextWidth = Number(size?.width);
+  const nextHeight = Number(size?.height);
+  if (!Number.isFinite(nextWidth) || !Number.isFinite(nextHeight)) {
+    return;
+  }
+
+  const width = Math.min(limits.maxWidth, Math.max(limits.minWidth, nextWidth));
+  const height = Math.min(limits.maxHeight, Math.max(limits.minHeight, nextHeight));
+  panel.style.width = `${width}px`;
+  panel.style.height = `${height}px`;
+  if (options.persistCorrected && (width !== nextWidth || height !== nextHeight)) {
+    saveProjectAssistantSize({ width, height });
+  }
+}
+
+function loadProjectAssistantPosition() {
+  applyProjectAssistantPosition(loadStoredProjectAssistantPosition(), { persistCorrected: true });
+}
+
+function loadStoredProjectAssistantPosition() {
+  try {
+    const raw = window.localStorage.getItem(PROJECT_ASSISTANT_POSITION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveProjectAssistantPosition(position) {
+  try {
+    window.localStorage.setItem(PROJECT_ASSISTANT_POSITION_KEY, JSON.stringify(position));
+  } catch (error) {
+    // Position persistence is optional.
+  }
+}
+
+function applyProjectAssistantPosition(position, options = {}) {
+  const widget = document.querySelector(".project-chat-widget");
+  if (!widget) {
+    return;
+  }
+
+  const rect = widget.getBoundingClientRect();
+  const margin = PROJECT_ASSISTANT_VIEWPORT_MARGIN;
+  const fallbackLeft = window.innerWidth - rect.width - margin;
+  const fallbackTop = window.innerHeight - rect.height - margin;
+  const nextLeft = Number(position?.left);
+  const nextTop = Number(position?.top);
+  const width = rect.width || 260;
+  const height = rect.height || 56;
+  const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - height - margin);
+  const left = Number.isFinite(nextLeft) ? nextLeft : fallbackLeft;
+  const top = Number.isFinite(nextTop) ? nextTop : fallbackTop;
+  const clampedLeft = Math.min(maxLeft, Math.max(margin, left));
+  const clampedTop = Math.min(maxTop, Math.max(margin, top));
+
+  widget.style.left = `${clampedLeft}px`;
+  widget.style.top = `${clampedTop}px`;
+  widget.style.right = "auto";
+  widget.style.bottom = "auto";
+  if (options.persistCorrected && (clampedLeft !== nextLeft || clampedTop !== nextTop)) {
+    saveProjectAssistantPosition({ left: clampedLeft, top: clampedTop });
+  }
 }
 
 function toggleProjectChat(forceOpen) {
@@ -1209,6 +1675,12 @@ function toggleProjectChat(forceOpen) {
   toggle?.setAttribute("aria-expanded", String(shouldOpen));
 
   if (shouldOpen) {
+    const widget = document.querySelector(".project-chat-widget");
+    applyProjectAssistantSize(loadStoredProjectAssistantSize(), { persistCorrected: true });
+    if (widget) {
+      const rect = widget.getBoundingClientRect();
+      applyProjectAssistantPosition({ left: rect.left, top: rect.top }, { persistCorrected: true });
+    }
     window.setTimeout(() => input?.focus(), 80);
     scrollProjectChatToBottom();
   }
@@ -1235,8 +1707,10 @@ async function sendProjectChatMessage(questionOverride) {
   state.projectChatBusy = true;
   if (sendButton) {
     sendButton.disabled = true;
+    sendButton.dataset.defaultText = sendButton.dataset.defaultText || sendButton.textContent || "Send";
+    sendButton.textContent = "Thinking...";
   }
-  renderProjectChatMessage("assistant", "Checking project notes...", { loading: true });
+  const loadingBubble = renderProjectChatMessage("assistant", "Checking project notes", { loading: true });
 
   try {
     const data = await apiJson(API.chat, {
@@ -1244,16 +1718,15 @@ async function sendProjectChatMessage(questionOverride) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "project", question })
     });
-    removeProjectChatLoading();
-    renderProjectChatMessage("assistant", data.answer || "I could not find a project answer for that question.");
+    replaceProjectChatLoading(loadingBubble, data.answer || "I could not find a project answer for that question.");
     renderProjectChatSuggestions(data.suggested_questions);
   } catch (error) {
-    removeProjectChatLoading();
-    renderProjectChatMessage("assistant", error.message, { error: true });
+    replaceProjectChatLoading(loadingBubble, error.message, { error: true });
   } finally {
     state.projectChatBusy = false;
     if (sendButton) {
       sendButton.disabled = false;
+      sendButton.textContent = sendButton.dataset.defaultText || "Send";
     }
     input?.focus();
   }
@@ -1275,40 +1748,328 @@ function renderProjectChatMessage(role, message, options = {}) {
     bubble.classList.add("project-chat-message--loading");
     bubble.dataset.chatLoading = "true";
   }
-  bubble.innerHTML = `<p>${escapeHtml(message)}</p>`;
+  bubble.innerHTML = chatMessageHtml(message, options);
   messages.appendChild(bubble);
   scrollProjectChatToBottom();
+  return bubble;
 }
 
-function renderProjectChatSuggestions(suggestions) {
+function renderProjectChatSuggestions() {
   const container = document.getElementById("project-chat-suggestions");
   if (!container) {
     return;
   }
 
-  const values = Array.isArray(suggestions) && suggestions.length
-    ? suggestions
-    : [
-        "What is ComboScore?",
-        "How does prediction work?",
-        "What does synergistic mean?",
-        "Is this clinical advice?",
-        "What is Explain AI?",
-        "What CSV format is required?"
-      ];
-
-  container.innerHTML = values
-    .slice(0, 6)
-    .map((question) => `<button type="button" data-chat-question="${escapeAttribute(question)}">${escapeHtml(question)}</button>`)
+  const activeKey = PROJECT_CHAT_TOPICS[state.projectChatTopic] ? state.projectChatTopic : "basics";
+  state.projectChatTopic = activeKey;
+  const activeTopic = PROJECT_CHAT_TOPICS[activeKey];
+  const visibleQuestions = state.projectChatExpanded
+    ? activeTopic.questions
+    : activeTopic.questions.slice(0, 3);
+  const topicButtons = Object.entries(PROJECT_CHAT_TOPICS)
+    .map(([key, topic]) => {
+      const isActive = key === activeKey;
+      return `
+        <button
+          type="button"
+          class="project-chat-topic-btn${isActive ? " is-active" : ""}"
+          data-chat-topic="${escapeAttribute(key)}"
+          aria-pressed="${isActive ? "true" : "false"}"
+        >${escapeHtml(topic.label)}</button>
+      `;
+    })
     .join("");
+  const questionButtons = visibleQuestions
+    .map((question) => `<button type="button" class="project-chat-question-btn" data-chat-question="${escapeAttribute(question)}">${escapeHtml(question)}</button>`)
+    .join("");
+  const moreButton = activeTopic.questions.length > 3
+    ? `<button type="button" class="project-chat-more-btn" data-chat-more="true">${state.projectChatExpanded ? "Less" : `More (${activeTopic.questions.length - 3})`}</button>`
+    : "";
+
+  container.innerHTML = `
+    <div class="project-chat-suggestion-label">Suggested topics</div>
+    <div class="project-chat-topics" role="list" aria-label="Project Assistant topics">${topicButtons}</div>
+    <div class="project-chat-topic-questions" aria-label="${escapeAttribute(activeTopic.label)} questions">${questionButtons}${moreButton}</div>
+  `;
 }
 
 function removeProjectChatLoading() {
   document.querySelectorAll("[data-chat-loading='true']").forEach((node) => node.remove());
 }
 
+function replaceProjectChatLoading(bubble, message, options = {}) {
+  const target = bubble?.isConnected ? bubble : document.querySelector("[data-chat-loading='true']");
+  if (!target) {
+    renderProjectChatMessage("assistant", message, options);
+    return;
+  }
+  delete target.dataset.chatLoading;
+  target.classList.remove("project-chat-message--loading");
+  if (options.error) {
+    target.classList.add("project-chat-message--error");
+  }
+  target.innerHTML = chatMessageHtml(message, options);
+  scrollProjectChatToBottom();
+}
+
 function scrollProjectChatToBottom() {
   const messages = document.getElementById("project-chat-messages");
+  if (messages) {
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
+
+function bindPredictionChat() {
+  const form = document.getElementById("prediction-chat-form");
+  const suggestions = document.getElementById("prediction-chat-suggestions");
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendPredictionChatMessage();
+  });
+
+  suggestions?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-prediction-chat-question]");
+    if (!button) {
+      return;
+    }
+    sendPredictionChatMessage(button.dataset.predictionChatQuestion);
+  });
+}
+
+function showPredictionAssistant(prediction) {
+  const panel = document.getElementById("prediction-assistant");
+  const locked = document.getElementById("prediction-chat-locked");
+  if (!panel) {
+    return;
+  }
+
+  panel.hidden = false;
+  if (locked) {
+    locked.hidden = true;
+  }
+  setText("prediction-chat-pair", `NSC ${prediction.nsc1} + NSC ${prediction.nsc2}`);
+  setText("prediction-chat-cell", prediction.cellLine);
+  setText("prediction-chat-score", `ComboScore ${formatScore(prediction.score, 3)} | ${semanticLabelForScore(prediction.score)}`);
+  setText("prediction-chat-model", prediction.model || "Auto-selected model");
+  setPredictionChatStatus("Ready", "neutral");
+  updatePredictionAssistantButton(true);
+
+  const messages = document.getElementById("prediction-chat-messages");
+  if (messages) {
+    messages.innerHTML = "";
+  }
+
+  renderPredictionChatMessage(
+    "assistant",
+    `I can explain the latest prediction for NSC ${prediction.nsc1} + NSC ${prediction.nsc2} in ${prediction.cellLine}. Ask about the score, model, direction averaging, safety, or next checks.`
+  );
+  renderPredictionChatSuggestions(predictionChatSuggestionsForPrediction(prediction));
+}
+
+function resetPredictionAssistant() {
+  const panel = document.getElementById("prediction-assistant");
+  const locked = document.getElementById("prediction-chat-locked");
+  if (panel) {
+    panel.hidden = true;
+  }
+  if (locked) {
+    locked.hidden = false;
+  }
+  const messages = document.getElementById("prediction-chat-messages");
+  if (messages) {
+    messages.innerHTML = "";
+  }
+  const input = document.getElementById("prediction-chat-input");
+  if (input) {
+    input.value = "";
+  }
+  updatePredictionAssistantButton(false);
+  setPredictionChatStatus("Locked", "neutral");
+}
+
+async function sendPredictionChatMessage(questionOverride) {
+  if (state.predictionChatBusy || !state.lastPrediction) {
+    return;
+  }
+
+  const input = document.getElementById("prediction-chat-input");
+  const sendButton = document.getElementById("prediction-chat-send");
+  const question = String(questionOverride ?? input?.value ?? "").trim();
+  if (!question) {
+    return;
+  }
+
+  renderPredictionChatMessage("user", question);
+  if (input) {
+    input.value = "";
+  }
+
+  state.predictionChatBusy = true;
+  if (sendButton) {
+    sendButton.disabled = true;
+    sendButton.dataset.defaultText = sendButton.dataset.defaultText || sendButton.textContent || "Ask";
+    sendButton.textContent = "Thinking...";
+  }
+  setPredictionChatStatus("Thinking", "neutral");
+  const loadingBubble = renderPredictionChatMessage("assistant", "Reading the latest prediction context", { loading: true });
+
+  try {
+    const data = await apiJson(API.chat, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildPredictionChatPayload(question))
+    });
+    replacePredictionChatLoading(loadingBubble, data.answer || "I could not explain that prediction question.");
+    renderPredictionChatSuggestions(data.suggested_questions);
+    setPredictionChatStatus(predictionChatSourceLabel(data), data.llm_used ? "good" : "neutral");
+  } catch (error) {
+    replacePredictionChatLoading(loadingBubble, error.message, { error: true });
+    setPredictionChatStatus("Error", "danger");
+  } finally {
+    state.predictionChatBusy = false;
+    if (sendButton) {
+      sendButton.disabled = false;
+      sendButton.textContent = sendButton.dataset.defaultText || "Ask";
+    }
+    input?.focus();
+  }
+}
+
+function renderPredictionChatMessage(role, message, options = {}) {
+  const messages = document.getElementById("prediction-chat-messages");
+  if (!messages) {
+    return;
+  }
+
+  const bubble = document.createElement("div");
+  const normalizedRole = role === "user" ? "user" : "assistant";
+  bubble.className = `prediction-chat-message prediction-chat-message--${normalizedRole}`;
+  if (options.error) {
+    bubble.classList.add("prediction-chat-message--error");
+  }
+  if (options.loading) {
+    bubble.classList.add("prediction-chat-message--loading");
+    bubble.dataset.predictionChatLoading = "true";
+  }
+  bubble.innerHTML = chatMessageHtml(message, options);
+  messages.appendChild(bubble);
+  scrollPredictionChatToBottom();
+  return bubble;
+}
+
+function renderPredictionChatSuggestions(suggestions) {
+  const container = document.getElementById("prediction-chat-suggestions");
+  if (!container) {
+    return;
+  }
+
+  const values = Array.isArray(suggestions) && suggestions.length
+    ? suggestions
+    : predictionChatSuggestionsForPrediction(state.lastPrediction);
+
+  container.innerHTML = values
+    .slice(0, 7)
+    .map((question) => `<button type="button" data-prediction-chat-question="${escapeAttribute(question)}">${escapeHtml(question)}</button>`)
+    .join("");
+}
+
+function buildPredictionChatPayload(question) {
+  const prediction = state.lastPrediction;
+  return {
+    mode: "prediction",
+    question,
+    prediction: {
+      input: {
+        NSC1: prediction.nsc1,
+        NSC2: prediction.nsc2,
+        CELLNAME: prediction.cellLine
+      },
+      prediction_NSC1_to_NSC2: prediction.forward,
+      prediction_NSC2_to_NSC1: prediction.reverse,
+      final_predicted_COMBOSCORE: prediction.score,
+      label: semanticLabelForScore(prediction.score),
+      model_used: prediction.model
+    },
+    explanation: explanationMatchesPrediction(state.lastExplanation, prediction) ? state.lastExplanation : null
+  };
+}
+
+function explanationMatchesPrediction(explanation, prediction) {
+  if (!explanation || !prediction || !explanation.input) {
+    return false;
+  }
+  return (
+    String(explanation.input.NSC1) === String(prediction.nsc1) &&
+    String(explanation.input.NSC2) === String(prediction.nsc2) &&
+    String(explanation.input.CELLNAME) === String(prediction.cellLine)
+  );
+}
+
+function predictionChatSuggestionsForPrediction(prediction) {
+  const label = String(prediction?.label || semanticLabelForScore(prediction?.score)).toLowerCase();
+  const labelQuestion = label.includes("antag")
+    ? "Why is this antagonistic?"
+    : label.includes("neutral")
+      ? "Why is this neutral?"
+      : "Why is this synergistic?";
+  return [
+    "Explain this result",
+    labelQuestion,
+    "What does this score mean?",
+    "What model was used?",
+    "Why predict both directions?",
+    "Is this clinical advice?",
+    "What should I check next?",
+    "Which features caused this?"
+  ];
+}
+
+function setPredictionChatStatus(text, tone = "neutral") {
+  const status = document.getElementById("prediction-chat-status");
+  if (!status) {
+    return;
+  }
+  status.textContent = text;
+  setToneClass(status, tone);
+}
+
+function predictionChatSourceLabel(data) {
+  if (data?.provider_label === "AI Enhanced" || data?.provider_label === "Built-in Guide") {
+    return data.provider_label;
+  }
+  return data?.llm_used ? "AI Enhanced" : "Built-in Guide";
+}
+
+function updatePredictionAssistantButton(isEnabled) {
+  const button = document.getElementById("open-prediction-assistant-btn");
+  if (!button) {
+    return;
+  }
+  button.disabled = !isEnabled;
+}
+
+function removePredictionChatLoading() {
+  document.querySelectorAll("[data-prediction-chat-loading='true']").forEach((node) => node.remove());
+}
+
+function replacePredictionChatLoading(bubble, message, options = {}) {
+  const target = bubble?.isConnected ? bubble : document.querySelector("[data-prediction-chat-loading='true']");
+  if (!target) {
+    renderPredictionChatMessage("assistant", message, options);
+    return;
+  }
+  delete target.dataset.predictionChatLoading;
+  target.classList.remove("prediction-chat-message--loading");
+  if (options.error) {
+    target.classList.add("prediction-chat-message--error");
+  }
+  target.innerHTML = chatMessageHtml(message, options);
+  scrollPredictionChatToBottom();
+}
+
+function scrollPredictionChatToBottom() {
+  const messages = document.getElementById("prediction-chat-messages");
   if (messages) {
     messages.scrollTop = messages.scrollHeight;
   }
@@ -1319,6 +2080,7 @@ async function runPredict() {
 
   const validation = refreshAllValidation();
   if (!validation.predict) {
+    resetPredictionAssistant();
     stopPredictionLoader({ restorePanel: true });
     showAlert("predict-alert", "Select valid drugs and a valid cell line before running prediction.");
     return;
@@ -1326,11 +2088,13 @@ async function runPredict() {
 
   const payload = buildModelPayload("drug1-id", "drug1-input", "drug2-id", "drug2-input", "cell-line");
   if (!payload) {
+    resetPredictionAssistant();
     stopPredictionLoader({ restorePanel: true });
     showAlert("predict-alert", getPredictionInputError("drug1-input", "drug2-input", "cell-line"));
     return;
   }
 
+  resetPredictionAssistant();
   setButtonLoading("predict-btn", "predict-btn-text", true, "Predict Synergy", "Running model");
   startPredictionLoader();
 
@@ -1344,6 +2108,7 @@ async function runPredict() {
     state.lastPrediction = prediction;
     stopPredictionLoader();
     renderPrediction(prediction);
+    showPredictionAssistant(prediction);
     savePredictionHistory(prediction);
     syncSelectionsFromPredict();
   } catch (error) {
@@ -1904,7 +2669,7 @@ async function runExplain() {
 
   const validation = refreshAllValidation();
   if (!validation.explain) {
-    showAlert("explain-alert", "Select valid drugs and a valid cell line before requesting the SHAP explanation.");
+    showAlert("explain-alert", "Select valid drugs and a valid cell line before requesting the XAI explanation.");
     return;
   }
 
@@ -1914,7 +2679,7 @@ async function runExplain() {
     return;
   }
 
-  setButtonLoading("explain-btn", "explain-btn-text", true, "Generate Explanation", "Computing SHAP");
+  setButtonLoading("explain-btn", "explain-btn-text", true, "Generate Explanation", "Computing XAI");
   startExplainLoader();
 
   try {
@@ -1931,7 +2696,7 @@ async function runExplain() {
     stopExplainLoader({ restorePanel: true });
     showAlert("explain-alert", error.message);
   } finally {
-    setButtonLoading("explain-btn", "explain-btn-text", false, "Generate Explanation", "Computing SHAP");
+    setButtonLoading("explain-btn", "explain-btn-text", false, "Generate Explanation", "Computing XAI");
     refreshAllValidation();
   }
 }
@@ -1979,6 +2744,10 @@ function normalizeExplanationResponse(data) {
 
   return {
     features,
+    top_positive_contributors: positive,
+    top_negative_contributors: negative,
+    input: data.input || {},
+    model_used: data.model_used || "",
     prediction: Number(data.final_predicted_COMBOSCORE ?? data.prediction ?? 0),
     baseValue: data.base_value ?? data.expected_value ?? null,
     summary: data.plain_english_explanation || data.explanation_summary || data.suggestion || ""
@@ -2032,7 +2801,7 @@ function renderExplanation(data) {
       state.shapChart = null;
     }
     renderShapFallback(chartShell, data.features);
-    showAlert("explain-alert", "Chart.js did not load, so a lightweight SHAP list is shown instead.");
+    showAlert("explain-alert", "Chart.js did not load, so a lightweight XAI list is shown instead.");
     return;
   }
 
@@ -2065,7 +2834,7 @@ function renderExplanation(data) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (item) => ` SHAP: ${item.parsed.x.toFixed(4)}`
+            label: (item) => ` XAI impact: ${item.parsed.x.toFixed(4)}`
           }
         }
       },
@@ -2115,7 +2884,7 @@ function renderShapFallback(container, features) {
     `;
   }).join("");
 
-  container.innerHTML = `<div class="shap-fallback-list">${rows || "<p>No SHAP contributors returned.</p>"}</div>`;
+  container.innerHTML = `<div class="shap-fallback-list">${rows || "<p>No XAI contributors returned.</p>"}</div>`;
 }
 
 async function loadDrugInfo() {
@@ -2331,6 +3100,7 @@ async function processBatchFile(file) {
     document.getElementById("batch-empty").hidden = true;
     document.getElementById("batch-result").classList.add("is-visible");
     state.lastBatchRendered = true;
+    requestBatchScrollRefresh();
     document.getElementById("download-btn").disabled = false;
     document.getElementById("drop-zone-title").textContent = `Processed ${file.name}`;
     setButtonLoading("batch-run-btn", "batch-run-btn-text", false, "Run Again", "Running Batch");
@@ -2473,6 +3243,7 @@ function renderBatchTable(rows) {
   if (!rows.length) {
     tableHead.innerHTML = "";
     tableBody.innerHTML = `<tr><td>No preview rows returned.</td></tr>`;
+    requestBatchScrollRefresh();
     return;
   }
 
@@ -2495,6 +3266,7 @@ function renderBatchTable(rows) {
       }).join("")}
     </tr>
   `).join("");
+  requestBatchScrollRefresh();
 }
 
 function batchLabelForRow(row, fallbackLabel) {
@@ -2727,6 +3499,26 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function formatChatText(value) {
+  const escaped = escapeHtml(value);
+  return escaped
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*\*/g, "")
+    .replace(/\r\n|\r|\n/g, "<br>");
+}
+
+function chatMessageHtml(message, options = {}) {
+  if (options.loading) {
+    return `
+      <p>
+        <span>${formatChatText(message)}</span>
+        <span class="chat-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </p>
+    `;
+  }
+  return `<p>${formatChatText(message)}</p>`;
 }
 
 function escapeAttribute(value) {

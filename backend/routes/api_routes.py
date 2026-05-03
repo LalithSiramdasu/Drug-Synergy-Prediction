@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, render_template, request, send_from_direct
 
 from backend import config
 from backend.services.batch_service import BatchPredictionError, run_batch_prediction
-from backend.services.chat_service import ChatServiceError, answer_project_question
+from backend.services.chat_service import ChatServiceError, answer_chat_question
 from backend.services.data_loader import build_health_report, get_available_cell_lines, get_available_drugs
 from backend.services.demo_service import DemoCaseError, get_demo_cases
 from backend.services.model_loader import ModelLoaderError, get_model_info
@@ -48,21 +48,21 @@ def model_performance_summary():
 def chat():
     payload = request.get_json(silent=True) or {}
     mode = str(payload.get("mode") or "project").strip().lower()
-    if mode != "project":
+    if mode not in {"project", "prediction"}:
         return jsonify(
             {
                 "status": "error",
-                "error": "Only project chat mode is available in this version.",
+                "error": "Only project and prediction chat modes are available in this version.",
             }
         ), 400
 
     payload["mode"] = mode
     try:
-        return jsonify(answer_project_question(payload))
+        return jsonify(answer_chat_question(payload))
     except ChatServiceError as exc:
         return jsonify({"status": "error", "error": str(exc)}), 400
     except Exception:
-        return jsonify({"status": "error", "error": "Project chat is unavailable."}), 500
+        return jsonify({"status": "error", "error": "Chat assistant is unavailable."}), 500
 
 
 @api_bp.get("/api/cell-lines")

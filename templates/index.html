@@ -57,7 +57,7 @@
         </div>
         <h1>SynergyLens</h1>
         <p class="hero-lead">
-          Predict drug-combination synergy, inspect SHAP feature impact, review compound metadata,
+          Predict drug-combination synergy, inspect XAI feature impact, review compound metadata,
           and process batch CSV files from one polished interface.
         </p>
         <div class="hero-actions">
@@ -70,7 +70,7 @@
       <div class="hero-metrics">
         <article class="metric-card"><span class="metric-label">Drugs</span><strong id="metric-drugs" class="metric-value">--</strong><span class="metric-note">indexed compounds</span></article>
         <article class="metric-card"><span class="metric-label">Cell Lines</span><strong id="metric-cell-lines" class="metric-value">--</strong><span class="metric-note">prediction contexts</span></article>
-        <article class="metric-card"><span class="metric-label">Pipeline</span><strong class="metric-value">ML + SHAP</strong><span class="metric-note">prediction and explanation</span></article>
+        <article class="metric-card"><span class="metric-label">Pipeline</span><strong class="metric-value">ML + XAI</strong><span class="metric-note">prediction and explanation</span></article>
         <article class="metric-card metric-card--accent backend-health-card" id="backend-health-card">
           <div class="health-card-top">
             <span class="metric-label">Backend</span>
@@ -122,7 +122,7 @@
           </article>
           <article class="panel home-route-card reveal reveal-delay-2">
             <span class="mini-label">Explain AI</span>
-            <strong>SHAP contributors</strong>
+            <strong>XAI contributors</strong>
             <p>Inspect features that push ComboScore upward or downward.</p>
             <button type="button" class="secondary-button" data-view-trigger="explain">Explain AI</button>
           </article>
@@ -249,6 +249,7 @@
                 <article class="interpretation-card"><span class="section-kicker">Interpretation</span><div id="score-summary" class="result-story">The model interpretation will appear here after prediction.</div></article>
                 <div class="report-actions">
                   <button type="button" class="secondary-button report-download-button" id="prediction-report-btn" disabled>Download Prediction Report</button>
+                  <button type="button" class="primary-button prediction-assistant-button" id="open-prediction-assistant-btn" disabled>Ask Prediction Assistant</button>
                 </div>
               </div>
             </article>
@@ -261,7 +262,7 @@
           <aside class="panel control-panel reveal">
             <div class="section-header">
               <span class="section-kicker">Explainability</span>
-              <h2 class="section-title">SHAP Feature Impact</h2>
+              <h2 class="section-title">XAI Feature Impact</h2>
               <p class="section-copy">Use the same drug pair and context to inspect the features driving the score.</p>
             </div>
             <div id="explain-alert" class="inline-alert" role="alert" hidden></div>
@@ -297,12 +298,12 @@
             <div class="panel-header panel-header--spread">
               <div>
                 <span class="section-kicker">Top Drivers</span>
-                <h2 class="section-title">Contribution Map</h2>
+                <h2 class="section-title">XAI Contribution Map</h2>
                 <p class="section-copy">Teal bars push the ComboScore upward toward synergy. Red bars pull the ComboScore downward toward antagonism.</p>
               </div>
               <div class="legend-group"><span><i class="legend-swatch legend-swatch--synergy"></i> More synergistic</span><span><i class="legend-swatch legend-swatch--antagonism"></i> More antagonistic</span></div>
             </div>
-            <div id="shap-empty" class="empty-state empty-state--compact"><h3>Explanation panel ready</h3><p>Run an explanation request to render the top SHAP features.</p></div>
+            <div id="shap-empty" class="empty-state empty-state--compact"><h3>Explanation panel ready</h3><p>Run an explanation request to render the top XAI features.</p></div>
             <div id="explain-loader" class="prediction-loader inline-loader" hidden aria-live="polite" aria-busy="true">
               <div class="prediction-loader-ring" aria-hidden="true"></div>
               <p id="explain-loader-message" class="prediction-loader-message">Validating prediction input...</p>
@@ -422,9 +423,56 @@
               <span>Screening confidence: model-based estimate, not a calibrated probability</span>
               <p>This is a machine-learning screening prediction. It is not biological proof and not clinical advice. Promising synergy predictions should be validated experimentally.</p>
             </aside>
-            <div class="table-shell"><table id="batch-table"><thead><tr id="batch-thead"></tr></thead><tbody id="batch-tbody"></tbody></table></div>
+            <p class="batch-scroll-hint" id="batch-scroll-hint" hidden>Scroll horizontally inside the table to view all columns.</p>
+            <div class="table-shell batch-table-scroll" id="batch-table-scroll" tabindex="0" aria-label="Batch prediction preview table">
+              <table id="batch-table"><thead><tr id="batch-thead"></tr></thead><tbody id="batch-tbody"></tbody></table>
+            </div>
           </div>
           <div id="batch-empty" class="empty-state empty-state--compact"><h3>Batch results will appear here</h3><p>Process a CSV to unlock the preview and download action.</p></div>
+        </article>
+      </section>
+
+      <section id="view-prediction-chat" class="view" role="tabpanel" aria-label="Prediction Assistant" aria-hidden="true">
+        <article class="panel prediction-assistant-panel reveal">
+          <div class="panel-header panel-header--spread">
+            <div>
+              <span class="section-kicker">Dynamic Assistant</span>
+              <h2 class="section-title">Prediction Assistant</h2>
+              <p class="section-copy">Ask about the latest NSC pair, cell line, ComboScore, model, and interpretation.</p>
+            </div>
+            <span class="status-pill tone-neutral" id="prediction-chat-status">Locked</span>
+          </div>
+
+          <div id="prediction-chat-locked" class="empty-state empty-state--compact">
+            <h3>Run a prediction first</h3>
+            <p>Run a prediction first to unlock prediction-aware chat.</p>
+            <button type="button" class="primary-button" data-view-trigger="predict">Go to Predict</button>
+          </div>
+
+          <div class="prediction-assistant" id="prediction-assistant" hidden>
+            <div class="prediction-chat-context" aria-label="Prediction Assistant context">
+              <span><strong id="prediction-chat-pair">NSC -- + NSC --</strong></span>
+              <span id="prediction-chat-cell">Cell line --</span>
+              <span id="prediction-chat-score">ComboScore --</span>
+              <span id="prediction-chat-model">Model --</span>
+            </div>
+            <div class="prediction-chat-messages" id="prediction-chat-messages" aria-live="polite"></div>
+            <div class="prediction-chat-suggestions" id="prediction-chat-suggestions">
+              <button type="button" data-prediction-chat-question="Explain this result">Explain this result</button>
+              <button type="button" data-prediction-chat-question="Why is this synergistic?">Why is this synergistic?</button>
+              <button type="button" data-prediction-chat-question="What does this score mean?">What does this score mean?</button>
+              <button type="button" data-prediction-chat-question="What model was used?">What model was used?</button>
+              <button type="button" data-prediction-chat-question="Why predict both directions?">Why predict both directions?</button>
+              <button type="button" data-prediction-chat-question="Is this clinical advice?">Is this clinical advice?</button>
+              <button type="button" data-prediction-chat-question="What should I check next?">What should I check next?</button>
+              <button type="button" data-prediction-chat-question="Which features caused this?">Which features caused this?</button>
+            </div>
+            <form class="prediction-chat-form" id="prediction-chat-form">
+              <label class="sr-only" for="prediction-chat-input">Ask about this prediction</label>
+              <input type="text" id="prediction-chat-input" placeholder="Ask about this prediction..." autocomplete="off">
+              <button type="submit" id="prediction-chat-send">Ask</button>
+            </form>
+          </div>
         </article>
       </section>
 
@@ -449,7 +497,7 @@
             <article class="mini-card">
               <span class="mini-label">Safety</span>
               <strong>Screening Only</strong>
-              <p>Predictions and SHAP explanations are machine-learning screening estimates, not calibrated probabilities, biological proof, or clinical advice. Promising synergy predictions should be validated experimentally.</p>
+              <p>Predictions and XAI explanations are machine-learning screening estimates, not calibrated probabilities, biological proof, or clinical advice. Promising synergy predictions should be validated experimentally.</p>
             </article>
           </div>
         </article>
@@ -517,7 +565,7 @@
         <div>
           <span class="section-kicker">Project Help</span>
           <h2>Project Assistant</h2>
-          <p>Ask about SynergyLens, ComboScore, models, SHAP, batch format, and safety.</p>
+          <p>Ask about SynergyLens, ComboScore, models, XAI, batch format, and safety.</p>
         </div>
         <button type="button" class="project-chat-close" id="project-chat-close" aria-label="Close Project Assistant">Close</button>
       </div>
@@ -529,12 +577,21 @@
       </div>
 
       <div class="project-chat-suggestions" id="project-chat-suggestions" aria-label="Suggested project questions">
-        <button type="button" data-chat-question="What is ComboScore?">What is ComboScore?</button>
-        <button type="button" data-chat-question="How does prediction work?">How does prediction work?</button>
-        <button type="button" data-chat-question="What does synergistic mean?">What does synergistic mean?</button>
-        <button type="button" data-chat-question="Is this clinical advice?">Is this clinical advice?</button>
-        <button type="button" data-chat-question="What is Explain AI?">What is Explain AI?</button>
-        <button type="button" data-chat-question="What CSV format is required?">What CSV format is required?</button>
+        <div class="project-chat-suggestion-label">Suggested topics</div>
+        <div class="project-chat-topics" role="list" aria-label="Project Assistant topics">
+          <button type="button" class="project-chat-topic-btn is-active" data-chat-topic="basics" aria-pressed="true">Basics</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="prediction" aria-pressed="false">Prediction</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="xai" aria-pressed="false">XAI</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="batch" aria-pressed="false">Batch</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="molecules" aria-pressed="false">Molecules</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="backend" aria-pressed="false">Backend</button>
+          <button type="button" class="project-chat-topic-btn" data-chat-topic="safety" aria-pressed="false">Safety</button>
+        </div>
+        <div class="project-chat-topic-questions" aria-label="Basics questions">
+          <button type="button" class="project-chat-question-btn" data-chat-question="What is SynergyLens?">What is SynergyLens?</button>
+          <button type="button" class="project-chat-question-btn" data-chat-question="What is ComboScore?">What is ComboScore?</button>
+          <button type="button" class="project-chat-question-btn" data-chat-question="What is NSC?">What is NSC?</button>
+        </div>
       </div>
 
       <form class="project-chat-form" id="project-chat-form">
@@ -542,6 +599,10 @@
         <input type="text" id="project-chat-input" placeholder="Ask a project question..." autocomplete="off">
         <button type="submit" id="project-chat-send">Send</button>
       </form>
+
+      <div class="project-chat-resize-handle project-chat-resize-handle--right" data-chat-resize="right" aria-hidden="true"></div>
+      <div class="project-chat-resize-handle project-chat-resize-handle--bottom" data-chat-resize="bottom" aria-hidden="true"></div>
+      <div class="project-chat-resize-handle project-chat-resize-handle--corner" data-chat-resize="corner" aria-hidden="true"></div>
     </section>
   </aside>
 </body>
