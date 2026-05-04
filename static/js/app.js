@@ -37,7 +37,11 @@ const state = {
   projectChatDrag: null,
   projectChatResize: null,
   projectChatSuppressClick: false,
-  inlineLoaders: {}
+  inlineLoaders: {},
+  gaugeDisplayScore: 0,
+  gaugeInitialized: false,
+  gaugeAnimationFrame: null,
+  gaugeTicksRendered: false
 };
 
 const autocompleteTimers = {};
@@ -207,6 +211,19 @@ const VALIDATION_GROUPS = {
 const NEUTRAL_THRESHOLD = 20;
 const SCORE_DISPLAY_MIN = -500;
 const SCORE_DISPLAY_MAX = 500;
+const GAUGE_MAJOR_TICKS = [-500, -250, 0, 250, 500];
+const GAUGE_MEDIUM_TICKS = [-400, -300, -200, -100, 100, 200, 300, 400];
+const GAUGE_MINOR_TICKS = [-450, -350, -150, -50, 50, 150, 350, 450];
+const GAUGE_GEOMETRY = {
+  cx: 130,
+  cy: 122,
+  radius: 95,
+  tickOuterRadius: 82,
+  labelRadius: 50,
+  startAngle: -180,
+  endAngle: 0
+};
+const GAUGE_ANIMATION_DURATION = 1080;
 const DEFAULT_VIEW = "home";
 const VIEW_HASHES = {
   home: "home",
@@ -238,6 +255,7 @@ const VIEW_ALIASES = {
 
 document.addEventListener("DOMContentLoaded", () => {
   bindThemeToggle();
+  initializeGauge();
   document.body.classList.add("is-ready");
   bindViewNavigation();
   bindAutocomplete();
@@ -714,15 +732,12 @@ function renderDemoCases(cases) {
   }
 
   container.innerHTML = cases.map((demo, index) => {
-    const score = demo.predicted_score ?? demo.predicted_comboscore ?? demo.final_predicted_COMBOSCORE;
     const title = DEMO_TITLES[demo.case_type] || demo.case_type || `Demo ${index + 1}`;
-    const label = demo.label || labelForScore(Number(score));
     return `
       <button class="demo-case-card" type="button" data-demo-index="${index}">
         <strong>${escapeHtml(title)}</strong>
         <span>NSC ${escapeHtml(String(demo.NSC1))} + NSC ${escapeHtml(String(demo.NSC2))}</span>
         <span>${escapeHtml(String(demo.CELLNAME))}</span>
-        <span class="demo-score">${escapeHtml(formatMaybeNumber(score))} | ${escapeHtml(label)}</span>
       </button>
     `;
   }).join("");
@@ -2355,10 +2370,8 @@ function renderPrediction(data) {
   document.getElementById("results-empty").hidden = true;
   document.getElementById("results-content").hidden = false;
 
-  setText("score-value", formatScore(data.score, 2));
   setText("score-label", data.label);
   document.getElementById("score-label").style.color = data.color;
-  document.getElementById("score-value").style.color = data.color;
   setText("r-drug1", `NSC ${data.nsc1}`);
   setText("r-drug2", `NSC ${data.nsc2}`);
   setText("r-cell", data.cellLine);
@@ -2631,17 +2644,267 @@ function scoreMeaningForScore(score) {
 }
 
 function setGauge(score, color, min, max) {
-  const arc = document.getElementById("gauge-arc");
-  if (!arc) {
+  const targetScore = Number(score);
+  const safeTargetScore = Number.isFinite(targetScore) ? targetScore : 0;
+  const scoreValue = document.getElementById("score-value");
+  if (!scoreValue) {
+    return;
+  }
+  const displayedScore = Number(scoreValue.textContent);
+  const startScore = Number.isFinite(displayedScore)
+    ? displayedScore
+    : state.gaugeDisplayScore;
+  const duration = GAUGE_ANIMATION_DURATION;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (state.gaugeAnimationFrame) {
+    window.cancelAnimationFrame(state.gaugeAnimationFrame);
+    state.gaugeAnimationFrame = null;
+  }
+
+  if (reducedMotion) {
+    updateGaugeFrame(safeTargetScore, min, max, getGaugeColor(safeTargetScore));
+    state.gaugeDisplayScore = safeTargetScore;
+    state.gaugeInitialized = true;
     return;
   }
 
-  const safeMin = Number.isFinite(min) ? min : SCORE_DISPLAY_MIN;
-  const safeMax = Number.isFinite(max) && max > safeMin ? max : SCORE_DISPLAY_MAX;
-  const clamped = Math.max(safeMin, Math.min(safeMax, Number(score)));
-  const ratio = ((clamped - safeMin) / (safeMax - safeMin)) * 100;
-  arc.style.strokeDashoffset = String(100 - ratio);
-  arc.style.stroke = color;
+  state.gaugeInitialized = true;
+  animateGauge(startScore, safeTargetScore, duration, min, max);
+}
+
+function initializeGauge() {
+  renderGaugeTicks();
+  updateGaugeFrame(state.gaugeDisplayScore, SCORE_DISPLAY_MIN, SCORE_DISPLAY_MAX, getGaugeColor(state.gaugeDisplayScore));
+}
+
+function animateGauge(fromScore, toScore, duration, min = SCORE_DISPLAY_MIN, max = SCORE_DISPLAY_MAX) {
+  const safeFrom = Number.isFinite(Number(fromScore)) ? Number(fromScore) : 0;
+  const safeTo = Number.isFinite(Number(toScore)) ? Number(toScore) : 0;
+  const fromColor = getGaugeColor(safeFrom);
+  const toColor = getGaugeColor(safeTo);
+  const startedAt = window.performance.now();
+
+  const step = (now) => {
+    const elapsed = now - startedAt;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOutCubic(progress);
+    const value = safeFrom + ((safeTo - safeFrom) * easedProgress);
+    const frameColor = mixColors(fromColor, toColor, easedProgress);
+
+    updateGaugeFrame(value, min, max, frameColor);
+
+    if (progress < 1) {
+      state.gaugeAnimationFrame = window.requestAnimationFrame(step);
+      return;
+    }
+
+    state.gaugeAnimationFrame = null;
+    updateGaugeFrame(safeTo, min, max, toColor);
+    state.gaugeDisplayScore = safeTo;
+  };
+
+  state.gaugeAnimationFrame = window.requestAnimationFrame(step);
+}
+
+function updateGaugeFrame(score, min, max, color) {
+  const gaugeCard = document.querySelector(".gauge-card");
+  const arc = document.getElementById("gauge-arc");
+  const needle = document.getElementById("gauge-needle");
+  const scoreValue = document.getElementById("score-value");
+  const scoreLabel = document.getElementById("score-label");
+  if (!arc || !needle || !scoreValue) {
+    return;
+  }
+
+  const dashOffset = 100 - (scoreToGaugeRatio(score, min, max) * 100);
+  const needleAngle = scoreToNeedleAngle(score, min, max);
+  const gaugeColor = color || getGaugeColor(score);
+
+  if (gaugeCard) {
+    gaugeCard.style.setProperty("--gauge-active-color", gaugeColor);
+  }
+  arc.style.strokeDashoffset = String(dashOffset);
+  arc.style.stroke = gaugeColor;
+  needle.style.transform = `rotate(${needleAngle}deg)`;
+  needle.style.color = gaugeColor;
+  scoreValue.textContent = formatScore(score, 2);
+  scoreValue.style.color = "#f7fbfa";
+  if (scoreLabel) {
+    scoreLabel.style.color = gaugeColor;
+  }
+}
+
+function easeOutCubic(value) {
+  return 1 - Math.pow(1 - value, 3);
+}
+
+function clamp(value, min, max) {
+  const numericValue = Number(value);
+  const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+  return Math.max(min, Math.min(max, safeValue));
+}
+
+function clampGaugeScore(score, min = SCORE_DISPLAY_MIN, max = SCORE_DISPLAY_MAX) {
+  const { safeMin, safeMax } = normalizeGaugeBounds(min, max);
+  return clamp(score, safeMin, safeMax);
+}
+
+function scoreToGaugeRatio(score, min = SCORE_DISPLAY_MIN, max = SCORE_DISPLAY_MAX) {
+  const { safeMin, safeMax } = normalizeGaugeBounds(min, max);
+  const clampedScore = clampGaugeScore(score, safeMin, safeMax);
+  return (clampedScore - safeMin) / (safeMax - safeMin);
+}
+
+function scoreToNeedleAngle(score, min = SCORE_DISPLAY_MIN, max = SCORE_DISPLAY_MAX) {
+  return -90 + (scoreToGaugeRatio(score, min, max) * 180);
+}
+
+function scoreToGaugeAngle(score, min = SCORE_DISPLAY_MIN, max = SCORE_DISPLAY_MAX) {
+  const ratio = scoreToGaugeRatio(score, min, max);
+  return GAUGE_GEOMETRY.startAngle + (ratio * (GAUGE_GEOMETRY.endAngle - GAUGE_GEOMETRY.startAngle));
+}
+
+function polarToCartesian(cx, cy, radius, angleDegrees) {
+  const angleRadians = (angleDegrees * Math.PI) / 180;
+  return {
+    x: cx + (radius * Math.cos(angleRadians)),
+    y: cy + (radius * Math.sin(angleRadians))
+  };
+}
+
+function describeGaugeArc(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, startAngle);
+  const end = polarToCartesian(cx, cy, radius, endAngle);
+  const largeArcFlag = Math.abs(endAngle - startAngle) <= 180 ? 0 : 1;
+  return [
+    "M", formatSvgNumber(start.x), formatSvgNumber(start.y),
+    "A", radius, radius, 0, largeArcFlag, 1, formatSvgNumber(end.x), formatSvgNumber(end.y)
+  ].join(" ");
+}
+
+function renderGaugeTicks() {
+  if (state.gaugeTicksRendered) {
+    return;
+  }
+
+  const tickContainer = document.getElementById("gauge-ticks");
+  const labelContainer = document.getElementById("gauge-scale-labels");
+  if (!tickContainer || !labelContainer) {
+    return;
+  }
+
+  tickContainer.innerHTML = [
+    ...GAUGE_MINOR_TICKS.map((value) => buildGaugeTick(value, "minor")),
+    ...GAUGE_MEDIUM_TICKS.map((value) => buildGaugeTick(value, "medium")),
+    ...GAUGE_MAJOR_TICKS.map((value) => buildGaugeTick(value, "major"))
+  ].join("");
+
+  labelContainer.innerHTML = GAUGE_MAJOR_TICKS
+    .map((value) => buildGaugeScaleLabel(value))
+    .join("");
+
+  updateGaugeScaleLabels();
+  state.gaugeTicksRendered = true;
+}
+
+function buildGaugeTick(value, size) {
+  const angle = scoreToGaugeAngle(value);
+  const lengthMap = {
+    minor: 5,
+    medium: 8,
+    major: 13
+  };
+  const outerRadius = GAUGE_GEOMETRY.tickOuterRadius;
+  const innerRadius = outerRadius - lengthMap[size];
+  const inner = polarToCartesian(GAUGE_GEOMETRY.cx, GAUGE_GEOMETRY.cy, innerRadius, angle);
+  const outer = polarToCartesian(GAUGE_GEOMETRY.cx, GAUGE_GEOMETRY.cy, outerRadius, angle);
+  const className = `gauge-${size}-tick`;
+  const color = getGaugeColor(value);
+
+  return `<line class="${className}" x1="${formatSvgNumber(inner.x)}" y1="${formatSvgNumber(inner.y)}" x2="${formatSvgNumber(outer.x)}" y2="${formatSvgNumber(outer.y)}" style="--gauge-tick-color: ${color}"></line>`;
+}
+
+function buildGaugeScaleLabel(value) {
+  const angle = scoreToGaugeAngle(value);
+  const point = polarToCartesian(GAUGE_GEOMETRY.cx, GAUGE_GEOMETRY.cy, GAUGE_GEOMETRY.labelRadius, angle);
+  const color = getGaugeColor(value);
+  return `<text class="gauge-scale-label" x="${formatSvgNumber(point.x)}" y="${formatSvgNumber(point.y)}" style="--gauge-label-color: ${color}">${formatGaugeTickLabel(value)}</text>`;
+}
+
+function updateGaugeScaleLabels() {
+  document.querySelectorAll(".gauge-scale-label").forEach((label) => {
+    const value = Number(label.textContent);
+    if (Number.isFinite(value)) {
+      label.style.setProperty("--gauge-label-color", getGaugeColor(value));
+    }
+  });
+}
+
+function formatGaugeTickLabel(value) {
+  return Number(value) > 0 ? `+${value}` : String(value);
+}
+
+function formatSvgNumber(value) {
+  return Number(value).toFixed(2).replace(/\.?0+$/, "");
+}
+
+function getGaugeColor(score) {
+  const value = Number(score);
+  if (value <= -80) {
+    return "#f46f63";
+  }
+  if (value < -20) {
+    return "#ff936a";
+  }
+  if (value <= 20) {
+    return "#f6c94a";
+  }
+  if (value < 80) {
+    return "#20d7bd";
+  }
+  return "#5cead8";
+}
+
+function mixColors(fromColor, toColor, ratio) {
+  const from = hexToRgb(fromColor);
+  const to = hexToRgb(toColor);
+  const clampedRatio = clamp(ratio, 0, 1);
+  const mixed = {
+    r: Math.round(from.r + ((to.r - from.r) * clampedRatio)),
+    g: Math.round(from.g + ((to.g - from.g) * clampedRatio)),
+    b: Math.round(from.b + ((to.b - from.b) * clampedRatio))
+  };
+  return `rgb(${mixed.r}, ${mixed.g}, ${mixed.b})`;
+}
+
+function hexToRgb(color) {
+  const normalized = String(color || "").replace("#", "");
+  const value = normalized.length === 3
+    ? normalized.split("").map((character) => character + character).join("")
+    : normalized;
+  const parsed = Number.parseInt(value, 16);
+  if (!Number.isFinite(parsed)) {
+    return { r: 246, g: 201, b: 74 };
+  }
+  return {
+    r: (parsed >> 16) & 255,
+    g: (parsed >> 8) & 255,
+    b: parsed & 255
+  };
+}
+
+function normalizeGaugeBounds(min, max) {
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const safeMin = Number.isFinite(numericMin) ? numericMin : SCORE_DISPLAY_MIN;
+  const safeMax = Number.isFinite(numericMax) && numericMax > safeMin
+    ? numericMax
+    : SCORE_DISPLAY_MAX;
+  return {
+    safeMin,
+    safeMax: safeMax > safeMin ? safeMax : safeMin + 1
+  };
 }
 
 function syncSelectionsFromPredict() {

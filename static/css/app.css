@@ -47,7 +47,14 @@
   --drop-zone-bg-end: rgba(237, 245, 242, 0.92);
   --drop-zone-shadow: 0 20px 34px rgba(15, 118, 110, 0.10);
   --table-head-bg: #f7fbf8;
-  --gauge-track: rgba(20, 64, 55, 0.10);
+  --gauge-track: rgba(22, 44, 50, 0.22);
+  --gauge-shell: rgba(5, 19, 23, 0.92);
+  --gauge-shell-strong: rgba(6, 26, 32, 0.96);
+  --gauge-danger: #f46f63;
+  --gauge-antagonism: #ff936a;
+  --gauge-neutral: #f6c94a;
+  --gauge-synergy: #20d7bd;
+  --gauge-strong-synergy: #5cead8;
   --pulse-ring-border: rgba(15, 118, 110, 0.22);
   --pulse-core-start: rgba(15, 118, 110, 0.15);
   --pulse-core-end: rgba(37, 99, 235, 0.16);
@@ -124,6 +131,13 @@ body[data-theme="dark"] {
   --drop-zone-shadow: 0 20px 34px rgba(2, 8, 9, 0.36);
   --table-head-bg: #132229;
   --gauge-track: rgba(193, 227, 219, 0.14);
+  --gauge-shell: rgba(3, 14, 18, 0.94);
+  --gauge-shell-strong: rgba(6, 20, 25, 0.96);
+  --gauge-danger: #ff7669;
+  --gauge-antagonism: #ff9a6d;
+  --gauge-neutral: #ffd84f;
+  --gauge-synergy: #29e0c4;
+  --gauge-strong-synergy: #63f2df;
   --pulse-ring-border: rgba(44, 197, 176, 0.30);
   --pulse-core-start: rgba(44, 197, 176, 0.20);
   --pulse-core-end: rgba(90, 141, 255, 0.20);
@@ -873,14 +887,6 @@ body.is-ready .workspace-tabs.reveal,
   line-height: 1.45;
 }
 
-.demo-case-card .demo-score {
-  margin-top: 8px;
-  color: var(--accent-strong);
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  font-weight: 500;
-}
-
 .history-panel {
   margin-top: 20px;
   padding-top: 20px;
@@ -1454,12 +1460,32 @@ input::placeholder {
 
 .gauge-card {
   position: relative;
-  padding: 24px 24px 54px;
-  min-height: 260px;
+  padding: 22px 20px 28px;
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid rgba(96, 139, 136, 0.28);
+  border-radius: 28px;
+  background: var(--gauge-shell);
+  box-shadow: none;
+}
+
+.gauge-card::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  pointer-events: none;
+  border: 1px solid rgba(142, 240, 223, 0.12);
+  border-radius: 22px;
+}
+
+.gauge-stage {
+  position: relative;
+  width: min(100%, 560px);
+  margin: 0 auto;
 }
 
 .gauge-svg {
-  width: min(100%, 360px);
+  width: 100%;
   display: block;
   margin: 0 auto;
   overflow: visible;
@@ -1468,82 +1494,191 @@ input::placeholder {
 .gauge-track,
 .gauge-arc {
   fill: none;
-  stroke-width: 14;
   stroke-linecap: round;
 }
 
 .gauge-track {
+  stroke-width: 14;
   stroke: var(--gauge-track);
 }
 
 .gauge-arc {
-  stroke: var(--accent);
+  stroke: var(--gauge-active-color, var(--gauge-neutral));
+  stroke-width: 14;
   stroke-dasharray: 100;
   stroke-dashoffset: 100;
-  transition: stroke-dashoffset 950ms cubic-bezier(0.22, 1, 0.36, 1), stroke 250ms ease;
+  transition: stroke-dashoffset 1050ms cubic-bezier(0.22, 1, 0.36, 1), stroke 260ms ease;
+}
+
+.gauge-ticks line {
+  stroke-linecap: round;
+}
+
+.gauge-minor-tick {
+  stroke: rgba(210, 239, 235, 0.58);
+  stroke-width: 1.4;
+}
+
+.gauge-medium-tick {
+  stroke: rgba(230, 248, 244, 0.78);
+  stroke-width: 2.2;
+}
+
+.gauge-major-tick {
+  stroke: var(--gauge-tick-color, rgba(255, 255, 255, 0.86));
+  stroke-width: 3.4;
+}
+
+.gauge-scale-label {
+  fill: var(--gauge-label-color, var(--text));
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  paint-order: stroke;
+  stroke: rgba(3, 14, 18, 0.74);
+  stroke-width: 2.4px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.gauge-needle {
+  color: var(--gauge-active-color, var(--gauge-neutral));
+  transform-origin: 130px 122px;
+  transform-box: view-box;
+  transform: rotate(0deg);
+  transition: transform 1050ms cubic-bezier(0.22, 1, 0.36, 1), color 260ms ease;
+}
+
+.gauge-needle-pointer {
+  fill: currentColor;
+  stroke: rgba(255, 255, 255, 0.56);
+  stroke-width: 0.45;
+}
+
+.gauge-hub-ring {
+  fill: rgba(7, 18, 22, 0.92);
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.gauge-hub-core {
+  fill: #1a272b;
+  stroke: rgba(255, 255, 255, 0.34);
+  stroke-width: 1;
 }
 
 .gauge-value {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 83%;
   display: grid;
-  place-items: center;
-  align-content: center;
-  padding-top: 34px;
+  justify-items: center;
   text-align: center;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .gauge-value strong {
   display: block;
   max-width: min(82%, 320px);
-  font-size: 3rem;
+  color: #f7fbfa;
+  font-size: clamp(2.15rem, 7vw, 3.75rem);
+  font-weight: 700;
   line-height: 1;
   font-family: var(--mono);
+  letter-spacing: 0;
   overflow-wrap: anywhere;
 }
 
 .gauge-value span {
   display: block;
-  margin-top: 8px;
-  color: var(--muted-strong);
+  margin-top: 4px;
+  color: var(--gauge-active-color, var(--gauge-neutral));
+  font-size: clamp(0.9rem, 2.4vw, 1.25rem);
   font-weight: 600;
+  letter-spacing: 0;
 }
 
 .gauge-axis {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 28px;
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 18px auto 0;
+  width: min(100%, 720px);
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: clamp(0.68rem, 1.4vw, 0.86rem);
+  line-height: 1.25;
 }
 
-.gauge-axis span:nth-child(2) {
+.gauge-axis span {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 70px;
+  padding: 0 12px;
   text-align: center;
+  min-width: 0;
 }
 
-.gauge-axis span:nth-child(3) {
-  text-align: right;
-  color: var(--accent-strong);
+.gauge-axis span + span {
+  border-left: 1px solid rgba(210, 239, 235, 0.22);
 }
 
-.gauge-axis span:first-child {
-  color: var(--danger);
+.gauge-axis strong,
+.gauge-axis em {
+  display: block;
+  text-shadow: none;
+}
+
+.gauge-axis strong {
+  color: inherit;
+  font-size: clamp(0.76rem, 1.7vw, 1rem);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gauge-axis em {
+  font-style: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  color: inherit;
+  font-family: var(--sans);
+  font-size: clamp(0.72rem, 1.6vw, 0.98rem);
+  line-height: 1.18;
+}
+
+.gauge-axis .axis-strong-antagonism {
+  color: var(--gauge-danger);
+}
+
+.gauge-axis .axis-moderate-antagonism {
+  color: var(--gauge-antagonism);
+}
+
+.gauge-axis .axis-neutral {
+  color: var(--gauge-neutral);
+}
+
+.gauge-axis .axis-moderate-synergy {
+  color: var(--gauge-synergy);
+}
+
+.gauge-axis .axis-strong-synergy {
+  color: var(--gauge-strong-synergy);
 }
 
 .gauge-note {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 8px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.74rem;
+  position: relative;
+  z-index: 1;
+  margin: 20px 0 0;
+  color: rgba(210, 221, 220, 0.70);
+  font-size: clamp(0.78rem, 1.6vw, 0.94rem);
   text-align: center;
 }
 
@@ -2971,20 +3106,33 @@ body[data-theme="dark"] .project-chat-panel {
   }
 
   .gauge-card {
-    padding: 20px 16px 62px;
-    min-height: 245px;
+    padding: 18px 12px 22px;
+    min-height: 0;
   }
 
   .gauge-axis {
-    left: 16px;
-    right: 16px;
-    bottom: 30px;
-    font-size: 9px;
+    gap: 0;
+    margin-top: 12px;
+    font-size: 0.58rem;
+  }
+
+  .gauge-axis strong {
+    font-size: 0.62rem;
+  }
+
+  .gauge-axis em {
+    font-size: 0.59rem;
+  }
+
+  .gauge-axis span {
+    gap: 5px;
+    min-height: 58px;
+    padding: 0 5px;
   }
 
   .gauge-note {
-    left: 16px;
-    right: 16px;
+    margin-top: 12px;
+    font-size: 0.68rem;
   }
 
   .pair-banner,
@@ -3007,5 +3155,10 @@ body[data-theme="dark"] .project-chat-panel {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+
+  .gauge-arc,
+  .gauge-needle {
+    transition: none !important;
   }
 }
